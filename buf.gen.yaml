@@ -1,0 +1,29 @@
+# Java generation for the plugin ABI.
+#
+# The schema is not copied here. It lives once, in the GoCraft repository at
+# abi/v1/*.proto, and both sides generate from that one file — a schema parsed
+# or transcribed anywhere else is a second definition, free to drift without
+# anything noticing. `./gradlew generateProto` points buf at the sibling
+# checkout; the path is configurable, see gradle.properties.
+#
+# The plugin runs on the Buf Schema Registry, so no protoc and no
+# protoc-gen-java are needed locally. Generated sources are committed for the
+# same reason the Go side commits its own: building this repository must not
+# require buf, a network, or a GoCraft checkout.
+#
+# `lite` matters. Full protobuf-java is about 1.7 MB against a jar that has to
+# stay near 3 MB (§04); protobuf-javalite is roughly a tenth of that and gives
+# up only reflection and the text format, neither of which a runtime that
+# speaks a fixed set of envelopes has any use for.
+version: v2
+
+# The plugin version is pinned, and it has to be. Generated sources are
+# committed, so an unpinned plugin means regenerating on a different day emits
+# gencode for a newer runtime than the one on the classpath — which fails as
+# dozens of "cannot find symbol" errors in files nobody edited. It must match
+# protobuf-javalite in build.gradle.kts exactly; changing one means changing
+# both, in the same commit.
+plugins:
+  - remote: buf.build/protocolbuffers/java:v4.36.0
+    out: src/main/generated
+    opt: lite
