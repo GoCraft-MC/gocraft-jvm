@@ -104,6 +104,11 @@ tasks.jar {
 
 tasks.test {
     useJUnitPlatform()
+    // The same flag runtime/jvm passes when the server spawns this runtime.
+    // protobuf reaches for sun.misc.Unsafe, which Java 24 made a terminal
+    // deprecation, and the four warning lines it prints are not something
+    // anyone here can act on.
+    jvmArgs("--sun-misc-unsafe-memory-access=allow")
     testLogging {
         events("failed")
         exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
