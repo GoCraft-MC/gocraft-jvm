@@ -10,30 +10,55 @@ alongside a future Lua and Python one.
 
 ## What it is today
 
-A vertical slice: the runtime starts, speaks the ABI, and answers everything the
-host sends it. It loads no plugins yet — classloading, the plugin API and the
-dispatch path are the next milestone.
-
-That is further than it sounds. Booting GoCraft against this jar produces:
-
-```
-plugins: startup aborted
-  load plugin fr.oreo.hello: this runtime build loads no plugins yet:
-  it speaks the ABI, but classloading and the plugin API are the next milestone
-```
-
-The message comes from this repository and reaches a Go console verbatim, which
-means the socket, the handshake, the framing, the LOAD and the FAIL all crossed
-the boundary intact — and that two independently generated protobuf
-implementations agree on the wire.
+The runtime starts, speaks the ABI, and loads plugins into isolated
+classloaders. What it cannot do yet is dispatch an event to one: nothing
+subscribes, so every DISPATCH is answered without cancelling.
 
 | Implemented | Not yet |
 | --- | --- |
-| HELLO / WELCOME, with ABI refused rather than negotiated | Classloaders, isolated and shared |
-| Length-delimited framing, dedicated writer thread | Plugin instantiation and `enable()` |
-| LOAD answered with a reason, per plugin | Event dispatch on virtual threads |
-| PING / PONG on the reader thread | Command invocation — the ABI has no frame for it |
-| UNLOAD, READY, SHUTDOWN | Host proxy, services, scoped values |
+| HELLO / WELCOME, with ABI refused rather than negotiated | Event dispatch on virtual threads |
+| Length-delimited framing, dedicated writer thread | Config, data store and scheduler injection |
+| Child-first classloader, `fr.gocraft.api` shared | Command invocation — the ABI has no frame for it |
+| Plugin construction, `enable()` and `disable()` | Host proxy, services, scoped values |
+| Unload that releases the classloader and its files | Plugin-defined events |
+| LOAD answered with a reason, per plugin | Annotated classes without an entry (§05) |
+| PING / PONG on the reader thread | |
+
+A plugin is a `payload/*.jar` inside the bundle, implementing `Plugin` with one
+constructor. Only `Host` can be injected so far; a constructor asking for
+anything else is refused by name rather than failing obscurely.
+
+## Why this is more than it looks
+
+Booting GoCraft against this jar produced, before any plugin could load:
+
+```
+plugins: startup aborted
+  load plugin fr.oreo.hello: this runtime build loads no plugins yet
+```
+
+That message was written here and reached a Go console verbatim — so the socket,
+the handshake, the framing, the LOAD and the FAIL all crossed the process
+boundary intact, and two independently generated protobuf implementations agree
+on the wire.
+
+## The two mistakes §13 says cost days
+
+Both have a test, because neither is visible by reading the code.
+
+**A shared API that is not shared.** If `fr.gocraft.api` came from the plugin's
+own loader, the `Plugin` the runtime casts to would be a different class from
+the one the plugin implements. Both are named `fr.gocraft.api.Plugin`, both look
+right in a debugger, and the cast fails naming the same type twice.
+`PluginClassLoader` delegates that package to the parent, always, and
+`givesThePluginTheSameApiClassTheRuntimeUses` asserts it.
+
+**A reference retained past unload.** One forgotten handler, MethodHandle or
+scheduler task keeps the classloader alive, and with it every class the plugin
+defined — Bukkit's classic `/reload` leak, invisible until a server has been up
+for a week. `LoadedPlugin` exists to hold everything that must be released, and
+`releasesEveryClassloaderItLoads` cycles twenty-five loads while watching weak
+references.
 
 ## Building
 
