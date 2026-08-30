@@ -45,4 +45,42 @@ public interface LoadOrBuilder extends
    */
   com.google.protobuf.ByteString
       getEntryBytes();
+
+  /**
+   * <pre>
+   * Where this plugin's own files live: its configuration, unpacked from the
+   * bundle's config/ on first load, and anything it writes for itself.
+   *
+   * The host owns it. It creates the directory, seeds the defaults and never
+   * overwrites what an admin edited, so a runtime is told the path rather than
+   * deriving one — two runtimes deriving it separately would eventually derive
+   * it differently.
+   *
+   * Added in ABI 1 after the fact: a runtime built before this reads an empty
+   * string, which is why nothing may assume it is set.
+   * </pre>
+   *
+   * <code>string data_directory = 4 [json_name = "dataDirectory"];</code>
+   * @return The dataDirectory.
+   */
+  java.lang.String getDataDirectory();
+  /**
+   * <pre>
+   * Where this plugin's own files live: its configuration, unpacked from the
+   * bundle's config/ on first load, and anything it writes for itself.
+   *
+   * The host owns it. It creates the directory, seeds the defaults and never
+   * overwrites what an admin edited, so a runtime is told the path rather than
+   * deriving one — two runtimes deriving it separately would eventually derive
+   * it differently.
+   *
+   * Added in ABI 1 after the fact: a runtime built before this reads an empty
+   * string, which is why nothing may assume it is set.
+   * </pre>
+   *
+   * <code>string data_directory = 4 [json_name = "dataDirectory"];</code>
+   * @return The bytes for dataDirectory.
+   */
+  com.google.protobuf.ByteString
+      getDataDirectoryBytes();
 }

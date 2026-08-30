@@ -24,6 +24,7 @@ public  final class Load extends
     pluginId_ = "";
     bundlePath_ = "";
     entry_ = "";
+    dataDirectory_ = "";
   }
   public static final int PLUGIN_ID_FIELD_NUMBER = 1;
   private java.lang.String pluginId_;
@@ -163,6 +164,118 @@ public  final class Load extends
       com.google.protobuf.ByteString value) {
     checkByteStringIsUtf8(value);
     entry_ = value.toStringUtf8();
+
+  }
+
+  public static final int DATA_DIRECTORY_FIELD_NUMBER = 4;
+  private java.lang.String dataDirectory_;
+  /**
+   * <pre>
+   * Where this plugin's own files live: its configuration, unpacked from the
+   * bundle's config/ on first load, and anything it writes for itself.
+   *
+   * The host owns it. It creates the directory, seeds the defaults and never
+   * overwrites what an admin edited, so a runtime is told the path rather than
+   * deriving one — two runtimes deriving it separately would eventually derive
+   * it differently.
+   *
+   * Added in ABI 1 after the fact: a runtime built before this reads an empty
+   * string, which is why nothing may assume it is set.
+   * </pre>
+   *
+   * <code>string data_directory = 4 [json_name = "dataDirectory"];</code>
+   * @return The dataDirectory.
+   */
+  @java.lang.Override
+  public java.lang.String getDataDirectory() {
+    return dataDirectory_;
+  }
+  /**
+   * <pre>
+   * Where this plugin's own files live: its configuration, unpacked from the
+   * bundle's config/ on first load, and anything it writes for itself.
+   *
+   * The host owns it. It creates the directory, seeds the defaults and never
+   * overwrites what an admin edited, so a runtime is told the path rather than
+   * deriving one — two runtimes deriving it separately would eventually derive
+   * it differently.
+   *
+   * Added in ABI 1 after the fact: a runtime built before this reads an empty
+   * string, which is why nothing may assume it is set.
+   * </pre>
+   *
+   * <code>string data_directory = 4 [json_name = "dataDirectory"];</code>
+   * @return The bytes for dataDirectory.
+   */
+  @java.lang.Override
+  public com.google.protobuf.ByteString
+      getDataDirectoryBytes() {
+    return com.google.protobuf.ByteString.copyFromUtf8(dataDirectory_);
+  }
+  /**
+   * <pre>
+   * Where this plugin's own files live: its configuration, unpacked from the
+   * bundle's config/ on first load, and anything it writes for itself.
+   *
+   * The host owns it. It creates the directory, seeds the defaults and never
+   * overwrites what an admin edited, so a runtime is told the path rather than
+   * deriving one — two runtimes deriving it separately would eventually derive
+   * it differently.
+   *
+   * Added in ABI 1 after the fact: a runtime built before this reads an empty
+   * string, which is why nothing may assume it is set.
+   * </pre>
+   *
+   * <code>string data_directory = 4 [json_name = "dataDirectory"];</code>
+   * @param value The dataDirectory to set.
+   */
+  private void setDataDirectory(
+      java.lang.String value) {
+    java.util.Objects.requireNonNull(value);
+
+    dataDirectory_ = value;
+  }
+  /**
+   * <pre>
+   * Where this plugin's own files live: its configuration, unpacked from the
+   * bundle's config/ on first load, and anything it writes for itself.
+   *
+   * The host owns it. It creates the directory, seeds the defaults and never
+   * overwrites what an admin edited, so a runtime is told the path rather than
+   * deriving one — two runtimes deriving it separately would eventually derive
+   * it differently.
+   *
+   * Added in ABI 1 after the fact: a runtime built before this reads an empty
+   * string, which is why nothing may assume it is set.
+   * </pre>
+   *
+   * <code>string data_directory = 4 [json_name = "dataDirectory"];</code>
+   */
+  private void clearDataDirectory() {
+
+    dataDirectory_ = getDefaultInstance().getDataDirectory();
+  }
+  /**
+   * <pre>
+   * Where this plugin's own files live: its configuration, unpacked from the
+   * bundle's config/ on first load, and anything it writes for itself.
+   *
+   * The host owns it. It creates the directory, seeds the defaults and never
+   * overwrites what an admin edited, so a runtime is told the path rather than
+   * deriving one — two runtimes deriving it separately would eventually derive
+   * it differently.
+   *
+   * Added in ABI 1 after the fact: a runtime built before this reads an empty
+   * string, which is why nothing may assume it is set.
+   * </pre>
+   *
+   * <code>string data_directory = 4 [json_name = "dataDirectory"];</code>
+   * @param value The bytes for dataDirectory to set.
+   */
+  private void setDataDirectoryBytes(
+      com.google.protobuf.ByteString value) {
+    checkByteStringIsUtf8(value);
+    dataDirectory_ = value.toStringUtf8();
 
   }
 
@@ -416,6 +529,120 @@ public  final class Load extends
       return this;
     }
 
+    /**
+     * <pre>
+     * Where this plugin's own files live: its configuration, unpacked from the
+     * bundle's config/ on first load, and anything it writes for itself.
+     *
+     * The host owns it. It creates the directory, seeds the defaults and never
+     * overwrites what an admin edited, so a runtime is told the path rather than
+     * deriving one — two runtimes deriving it separately would eventually derive
+     * it differently.
+     *
+     * Added in ABI 1 after the fact: a runtime built before this reads an empty
+     * string, which is why nothing may assume it is set.
+     * </pre>
+     *
+     * <code>string data_directory = 4 [json_name = "dataDirectory"];</code>
+     * @return The dataDirectory.
+     */
+    @java.lang.Override
+    public java.lang.String getDataDirectory() {
+      return instance.getDataDirectory();
+    }
+    /**
+     * <pre>
+     * Where this plugin's own files live: its configuration, unpacked from the
+     * bundle's config/ on first load, and anything it writes for itself.
+     *
+     * The host owns it. It creates the directory, seeds the defaults and never
+     * overwrites what an admin edited, so a runtime is told the path rather than
+     * deriving one — two runtimes deriving it separately would eventually derive
+     * it differently.
+     *
+     * Added in ABI 1 after the fact: a runtime built before this reads an empty
+     * string, which is why nothing may assume it is set.
+     * </pre>
+     *
+     * <code>string data_directory = 4 [json_name = "dataDirectory"];</code>
+     * @return The bytes for dataDirectory.
+     */
+    @java.lang.Override
+    public com.google.protobuf.ByteString
+        getDataDirectoryBytes() {
+      return instance.getDataDirectoryBytes();
+    }
+    /**
+     * <pre>
+     * Where this plugin's own files live: its configuration, unpacked from the
+     * bundle's config/ on first load, and anything it writes for itself.
+     *
+     * The host owns it. It creates the directory, seeds the defaults and never
+     * overwrites what an admin edited, so a runtime is told the path rather than
+     * deriving one — two runtimes deriving it separately would eventually derive
+     * it differently.
+     *
+     * Added in ABI 1 after the fact: a runtime built before this reads an empty
+     * string, which is why nothing may assume it is set.
+     * </pre>
+     *
+     * <code>string data_directory = 4 [json_name = "dataDirectory"];</code>
+     * @param value The dataDirectory to set.
+     * @return This builder for chaining.
+     */
+    public Builder setDataDirectory(
+        java.lang.String value) {
+      copyOnWrite();
+      instance.setDataDirectory(value);
+      return this;
+    }
+    /**
+     * <pre>
+     * Where this plugin's own files live: its configuration, unpacked from the
+     * bundle's config/ on first load, and anything it writes for itself.
+     *
+     * The host owns it. It creates the directory, seeds the defaults and never
+     * overwrites what an admin edited, so a runtime is told the path rather than
+     * deriving one — two runtimes deriving it separately would eventually derive
+     * it differently.
+     *
+     * Added in ABI 1 after the fact: a runtime built before this reads an empty
+     * string, which is why nothing may assume it is set.
+     * </pre>
+     *
+     * <code>string data_directory = 4 [json_name = "dataDirectory"];</code>
+     * @return This builder for chaining.
+     */
+    public Builder clearDataDirectory() {
+      copyOnWrite();
+      instance.clearDataDirectory();
+      return this;
+    }
+    /**
+     * <pre>
+     * Where this plugin's own files live: its configuration, unpacked from the
+     * bundle's config/ on first load, and anything it writes for itself.
+     *
+     * The host owns it. It creates the directory, seeds the defaults and never
+     * overwrites what an admin edited, so a runtime is told the path rather than
+     * deriving one — two runtimes deriving it separately would eventually derive
+     * it differently.
+     *
+     * Added in ABI 1 after the fact: a runtime built before this reads an empty
+     * string, which is why nothing may assume it is set.
+     * </pre>
+     *
+     * <code>string data_directory = 4 [json_name = "dataDirectory"];</code>
+     * @param value The bytes for dataDirectory to set.
+     * @return This builder for chaining.
+     */
+    public Builder setDataDirectoryBytes(
+        com.google.protobuf.ByteString value) {
+      copyOnWrite();
+      instance.setDataDirectoryBytes(value);
+      return this;
+    }
+
     // @@protoc_insertion_point(builder_scope:gocraft.abi.v1.Load)
   }
   @java.lang.Override
@@ -435,10 +662,11 @@ public  final class Load extends
             "pluginId_",
             "bundlePath_",
             "entry_",
+            "dataDirectory_",
           };
           java.lang.String info =
-              "\u0000\u0003\u0000\u0000\u0001\u0003\u0003\u0000\u0000\u0000\u0001\u0208\u0002\u0208" +
-              "\u0003\u0208";
+              "\u0000\u0004\u0000\u0000\u0001\u0004\u0004\u0000\u0000\u0000\u0001\u0208\u0002\u0208" +
+              "\u0003\u0208\u0004\u0208";
           return newMessageInfo(DEFAULT_INSTANCE, info, objects);
       }
       case GET_DEFAULT_INSTANCE: {
