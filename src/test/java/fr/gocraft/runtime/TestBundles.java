@@ -77,12 +77,19 @@ final class TestBundles {
             throw new IllegalStateException("compiling the test plugin failed");
         }
 
+        // Every class the compiler produced, not just the named one: a plugin
+        // that keeps its handlers on a nested listener — which §05 recommends,
+        // because it can then be tested with no server — compiles to more than
+        // one file, and jarring only the first would load it half-formed.
         Path jar = directory.resolve("plugin.jar");
-        try (ZipOutputStream out = new ZipOutputStream(Files.newOutputStream(jar))) {
-            Path compiled = classes.resolve("test/plugin/" + className + ".class");
-            out.putNextEntry(new ZipEntry("test/plugin/" + className + ".class"));
-            out.write(Files.readAllBytes(compiled));
-            out.closeEntry();
+        try (ZipOutputStream out = new ZipOutputStream(Files.newOutputStream(jar));
+             var walk = Files.walk(classes)) {
+            for (Path compiled : walk.filter(Files::isRegularFile).sorted().toList()) {
+                out.putNextEntry(new ZipEntry(
+                        classes.relativize(compiled).toString().replace('\\', '/')));
+                out.write(Files.readAllBytes(compiled));
+                out.closeEntry();
+            }
         }
         return pack(directory.resolve(className + ".gcpkg"), List.of(entry("payload/plugin.jar", jar)));
     }
