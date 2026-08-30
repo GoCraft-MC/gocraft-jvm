@@ -70,9 +70,22 @@ tasks.register<Exec>("generateProto") {
     commandLine("buf", "generate", "--template", file("buf.gen.yaml").absolutePath, "-o", projectDir.absolutePath)
 }
 
+// Byte-identical across machines and runs, for the same reason gocraft-cli
+// stamps every .gcpkg entry with a fixed 1980 epoch.
+//
+// A jar is a zip, and a zip stores a modification time per entry, so the
+// default output differs on every build even when nothing changed. That is not
+// cosmetic here: the GoCraft host extracts this jar under a name derived from
+// its content hash, precisely so a server can never pick up the jar a previous
+// version left behind. Non-reproducible bytes would mean a fresh cache entry
+// per build, and a release that cannot be verified against its source.
+tasks.withType<AbstractArchiveTask>().configureEach {
+    isPreserveFileTimestamps = false
+    isReproducibleFileOrder = true
+}
+
 tasks.jar {
-    // The name the GoCraft host embeds and spawns. It is content-addressed on
-    // the Go side, so what matters here is only that it stays stable.
+    // The name the GoCraft host embeds and spawns.
     archiveFileName = "gocraft-runtime.jar"
     manifest {
         attributes(
