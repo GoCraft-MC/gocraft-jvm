@@ -67,7 +67,15 @@ tasks.register<Exec>("generateProto") {
         }
     }
     workingDir = schema
-    commandLine("buf", "generate", "--template", file("buf.gen.yaml").absolutePath, "-o", projectDir.absolutePath)
+    // Only the envelope. events.proto and options.proto are read by
+    // protoc-gen-gocraft to decide what the generated event classes look like;
+    // they are never serialised, so their protobuf message classes would be
+    // dead weight in a jar with a 3 MB budget — and an invitation to import
+    // fr.gocraft.abi.v1.BlockBreak instead of the event class that carries the
+    // named accessors. commands.proto joins this list when the ABI grows a
+    // command frame.
+    commandLine("buf", "generate", "--template", file("buf.gen.yaml").absolutePath,
+        "-o", projectDir.absolutePath, "--path", "abi/v1/envelope.proto")
 }
 
 // Byte-identical across machines and runs, for the same reason gocraft-cli

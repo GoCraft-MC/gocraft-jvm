@@ -20,10 +20,13 @@ version: v2
 # The plugin version is pinned, and it has to be. Generated sources are
 # committed, so an unpinned plugin means regenerating on a different day emits
 # gencode for a newer runtime than the one on the classpath — which fails as
-# dozens of "cannot find symbol" errors in files nobody edited. It must match
-# protobuf-javalite in build.gradle.kts exactly; changing one means changing
-# both, in the same commit.
+# dozens of "cannot find symbol" errors in files nobody edited.
+#
+# The two spellings are not a typo. protobuf releases this generator as 36.0 and
+# the Java runtime it targets as 4.36.0, so the pin here reads v36.0 and
+# protobuf-javalite in build.gradle.kts reads 4.36.0. They are the same release:
+# changing one means changing the other, in the same commit.
 plugins:
-  - remote: buf.build/protocolbuffers/java:v4.36.0
+  - remote: buf.build/protocolbuffers/java:v36.0
     out: src/main/generated
     opt: lite
