@@ -41,6 +41,6 @@ public final class PlayerJoinEvent extends fr.gocraft.api.Event {
     /// sent on its own — which is what keeps one event to one round trip
     /// however much a handler asks for.
     public void sendMessage(String message) {
-        effect("chat.message", Values.text(message));
+        effect("chat.message", field(0), Values.text(message));
     }
 }
