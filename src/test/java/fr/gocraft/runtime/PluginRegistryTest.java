@@ -1,6 +1,8 @@
 package fr.gocraft.runtime;
 
+import fr.gocraft.abi.v1.Dispatch;
 import fr.gocraft.abi.v1.Envelope;
+import fr.gocraft.abi.v1.Event;
 import fr.gocraft.abi.v1.Load;
 import fr.gocraft.abi.v1.Unload;
 import org.junit.jupiter.api.Test;
@@ -101,7 +103,10 @@ class PluginRegistryTest {
     @Test
     void answersADispatchForAPluginItDoesNotHave(@TempDir Path directory) throws Exception {
         try (PluginRegistry registry = registry(directory)) {
-            Envelope reply = registry.dispatch(9, "fr.oreo.hello");
+            Envelope reply = registry.dispatch(9, Dispatch.newBuilder()
+                    .setPluginId("fr.oreo.hello")
+                    .setEvent(Event.newBuilder().setType("block.break"))
+                    .build());
 
             assertEquals(9, reply.getSeq());
             assertTrue(reply.hasVerdict());

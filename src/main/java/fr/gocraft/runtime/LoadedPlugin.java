@@ -23,13 +23,16 @@ final class LoadedPlugin implements AutoCloseable {
     private final String id;
     private final PluginClassLoader loader;
     private final Path extracted;
+    private final Subscriptions subscriptions;
     private Plugin instance;
 
-    LoadedPlugin(String id, PluginClassLoader loader, Path extracted, Plugin instance) {
+    LoadedPlugin(String id, PluginClassLoader loader, Path extracted, Plugin instance,
+            Subscriptions subscriptions) {
         this.id = id;
         this.loader = loader;
         this.extracted = extracted;
         this.instance = instance;
+        this.subscriptions = subscriptions;
     }
 
     String id() {
@@ -42,6 +45,10 @@ final class LoadedPlugin implements AutoCloseable {
 
     ClassLoader loader() {
         return loader;
+    }
+
+    Subscriptions subscriptions() {
+        return subscriptions;
     }
 
     /// Stops the plugin and releases everything it holds.
@@ -58,8 +65,11 @@ final class LoadedPlugin implements AutoCloseable {
             failure = new IOException("plugin " + id + " threw from disable(): " + thrown, thrown);
         }
 
-        // Dropped before the loader is closed, because this is the reference
-        // that would retain it.
+        // Dropped before the loader is closed, because these are the
+        // references that would retain it. A Method holds its declaring class,
+        // which holds the classloader, which holds every class the plugin
+        // defined — the leak is one forgotten handler wide.
+        subscriptions.clear();
         instance = null;
 
         try {

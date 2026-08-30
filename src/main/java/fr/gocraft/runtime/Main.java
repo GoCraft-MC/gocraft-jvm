@@ -1,5 +1,6 @@
 package fr.gocraft.runtime;
 
+import fr.gocraft.abi.v1.Dispatch;
 import fr.gocraft.abi.v1.Envelope;
 import fr.gocraft.abi.v1.Welcome;
 
@@ -94,8 +95,8 @@ public final class Main {
     /// running here would stop the socket being read, so the host would time
     /// out on every subsequent event rather than on the one that was slow —
     /// which is how one misbehaving plugin takes the whole runtime down with
-    /// it. Nothing below blocks yet; the structure is what has to be right
-    /// before the dispatch that will.
+    /// it. LOAD is the deliberate exception: it is sequential by contract, and
+    /// the host waits for each one before sending the next.
     private static int loop(Connection connection, PluginRegistry registry) throws IOException {
         while (true) {
             Envelope envelope;
@@ -113,8 +114,23 @@ public final class Main {
                 // graph and a plugin may rely on an earlier one being up.
                 case LOAD -> connection.send(registry.load(seq, envelope.getLoad()));
                 case UNLOAD -> registry.unload(envelope.getUnload());
-                case DISPATCH -> connection.send(
-                        registry.dispatch(seq, envelope.getDispatch().getPluginId()));
+                // On a virtual thread, because a handler is plugin code and
+                // may take as long as it likes. Running it here would stop the
+                // socket being read, so the host would time out on every
+                // subsequent event rather than on the one that was slow —
+                // which is how one bad plugin takes the runtime down with it.
+                case DISPATCH -> {
+                    Dispatch request = envelope.getDispatch();
+                    Thread.ofVirtual().start(() -> {
+                        Envelope reply = registry.dispatch(seq, request);
+                        try {
+                            connection.send(reply);
+                        } catch (IOException lost) {
+                            System.err.println("gocraft-runtime: could not answer a dispatch: "
+                                    + lost.getMessage());
+                        }
+                    });
+                }
                 // Answered here rather than by a handler, so a runtime busy
                 // running plugin code still pongs. Silence has to mean stuck,
                 // not merely busy, or the heartbeat measures the wrong thing.

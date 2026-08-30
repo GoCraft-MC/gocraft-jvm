@@ -65,8 +65,12 @@ final class PluginLoader {
         try {
             extracted = extractPayload(pluginId, bundlePath);
             loader = new PluginClassLoader(pluginId, classpath(extracted), getClass().getClassLoader());
-            Plugin instance = instantiate(loader, pluginId, entry);
-            LoadedPlugin loaded = new LoadedPlugin(pluginId, loader, extracted, instance);
+            // Built before the plugin, because the Host it is constructed with
+            // has to be able to take a listener during enable().
+            Subscriptions subscriptions = new Subscriptions();
+            Plugin instance = instantiate(loader, pluginId, entry, subscriptions);
+            registerOwnHandlers(instance, subscriptions);
+            LoadedPlugin loaded = new LoadedPlugin(pluginId, loader, extracted, instance, subscriptions);
             enable(loaded);
             return loaded;
         } catch (LoadFailure failure) {
@@ -118,6 +122,7 @@ final class PluginLoader {
     /// A URLClassLoader cannot read a jar nested inside another archive, so the
     /// jars come out first. One directory per plugin, deleted on unload,
     /// because two plugins may ship files of the same name.
+    ///
     /// bundlePath is quoted back exactly as the host sent it, rather than as a
     /// Path renders it. Path prints with the platform separator, so a message
     /// about `/plugins/shop.gcpkg` would reach a Windows admin as
@@ -184,8 +189,8 @@ final class PluginLoader {
     /// parameter it does not recognise is refused by name — an author who
     /// asked for a DataStore before the ABI can carry one deserves to be told
     /// that, not to see a NoSuchMethodException.
-    private Plugin instantiate(PluginClassLoader loader, String pluginId, String entry)
-            throws LoadFailure {
+    private Plugin instantiate(PluginClassLoader loader, String pluginId, String entry,
+            Subscriptions subscriptions) throws LoadFailure {
         Class<?> type;
         try {
             type = Class.forName(entry, false, loader);
@@ -204,7 +209,7 @@ final class PluginLoader {
                     + "which to inject");
         }
         Constructor<?> constructor = constructors[0];
-        Object[] arguments = resolve(constructor, pluginId, entry);
+        Object[] arguments = resolve(constructor, pluginId, entry, subscriptions);
         try {
             constructor.setAccessible(true);
             return (Plugin) constructor.newInstance(arguments);
@@ -216,13 +221,13 @@ final class PluginLoader {
         }
     }
 
-    private Object[] resolve(Constructor<?> constructor, String pluginId, String entry)
-            throws LoadFailure {
+    private Object[] resolve(Constructor<?> constructor, String pluginId, String entry,
+            Subscriptions subscriptions) throws LoadFailure {
         Class<?>[] parameters = constructor.getParameterTypes();
         Object[] arguments = new Object[parameters.length];
         for (int index = 0; index < parameters.length; index++) {
             if (parameters[index] == Host.class) {
-                arguments[index] = new RuntimeHost(pluginId);
+                arguments[index] = new RuntimeHost(pluginId, subscriptions);
                 continue;
             }
             throw new LoadFailure(entry + " asks for a " + parameters[index].getName()
@@ -237,10 +242,39 @@ final class PluginLoader {
     /// It writes to the runtime's own output, which the server routes into its
     /// console and latest.log, so a plugin's line appears beside the server's
     /// with the plugin that wrote it named.
-    private record RuntimeHost(String pluginId) implements Host {
+    private record RuntimeHost(String pluginId, Subscriptions subscriptions) implements Host {
         @Override
         public void log(String message) {
             System.out.println("[" + pluginId + "] " + message);
+        }
+
+        /// Refusing loudly rather than dropping the listener: a subscription
+        /// that silently never fires is indistinguishable from an event that
+        /// never happens, and costs an afternoon to tell apart.
+        @Override
+        public void registerListener(Object listener) {
+            try {
+                subscriptions.register(listener);
+            } catch (Subscriptions.InvalidHandler refused) {
+                throw new IllegalArgumentException(refused.getMessage(), refused);
+            }
+        }
+    }
+
+    /// Registers the plugin itself, when it carries handlers.
+    ///
+    /// Optional by design: a plugin that keeps its handlers on their own
+    /// listener — which §05 recommends, because it can then be tested with no
+    /// server at all — has none of its own, and that is not an error.
+    private void registerOwnHandlers(Plugin instance, Subscriptions subscriptions)
+            throws LoadFailure {
+        try {
+            subscriptions.register(instance);
+        } catch (Subscriptions.InvalidHandler noHandlers) {
+            if (subscriptions.size() == 0 && noHandlers.getMessage().contains("no @Subscribe")) {
+                return;
+            }
+            throw new LoadFailure(noHandlers.getMessage(), noHandlers);
         }
     }
 }

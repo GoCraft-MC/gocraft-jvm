@@ -1,9 +1,12 @@
 package fr.gocraft.runtime;
 
+import fr.gocraft.abi.v1.Dispatch;
 import fr.gocraft.abi.v1.Envelope;
 import fr.gocraft.abi.v1.Load;
 import fr.gocraft.abi.v1.Unload;
 import fr.gocraft.abi.v1.Verdict;
+import fr.gocraft.api.Event;
+import fr.gocraft.api.event.GeneratedEvents;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -56,11 +59,12 @@ final class PluginRegistry implements AutoCloseable {
         try {
             LoadedPlugin loaded = loader.load(id, request.getBundlePath(), request.getEntry());
             plugins.put(id, loaded);
-            // No events are reported: subscriptions come from the manifest the
-            // host already validated, and this runtime registers none of its
-            // own yet. Claiming one it cannot deliver would be worse than
-            // claiming none.
-            return Envelopes.loaded(seq, id);
+            // What the plugin actually registered. The host checks it against
+            // the manifest it validated and refuses anything undeclared, which
+            // it would otherwise never route — leaving the author with a
+            // handler that is simply never called.
+            return Envelopes.loaded(seq, id,
+                    loaded.subscriptions().types().toArray(String[]::new));
         } catch (PluginLoader.LoadFailure failure) {
             return Envelopes.fail(seq, id, failure.getMessage());
         }
@@ -84,13 +88,35 @@ final class PluginRegistry implements AutoCloseable {
         }
     }
 
-    /// Answers a dispatch.
+    /// Runs one event through one plugin's handlers and answers.
     ///
-    /// Nothing subscribes yet, so this always allows. It answers rather than
-    /// staying silent because the host blocks its tick on a verdict: saying
-    /// nothing burns the whole shared event budget before the event resolves,
-    /// and charges it to subscribers that never ran.
-    Envelope dispatch(long seq, String pluginId) {
+    /// It always answers, whatever happens. The host blocks its tick waiting
+    /// for this, under a budget shared by every subscriber, so silence does not
+    /// merely lose one verdict — it burns what was left of the budget and
+    /// charges it to plugins that never ran.
+    Envelope dispatch(long seq, Dispatch request) {
+        String pluginId = request.getPluginId();
+        LoadedPlugin loaded = plugins.get(pluginId);
+        if (loaded == null) {
+            return allow(seq);
+        }
+        var fields = EventCodec.fields(request.getEvent().getFieldsList());
+        Event event = GeneratedEvents.create(request.getEvent().getType(), fields);
+        if (event == null) {
+            // An event this build does not know. Allowing is the only honest
+            // answer: refusing something we cannot inspect would prevent
+            // gameplay on the strength of a version mismatch.
+            System.err.println("gocraft-runtime: " + pluginId + " was sent "
+                    + request.getEvent().getType() + ", which this build does not know");
+            return allow(seq);
+        }
+        loaded.subscriptions().dispatch(event.type(), event, (handler, thrown) ->
+                System.err.println("gocraft-runtime: " + pluginId + " handler " + handler
+                        + " threw " + thrown));
+        return Envelopes.verdict(seq, EventCodec.verdict(event));
+    }
+
+    private static Envelope allow(long seq) {
         return Envelopes.verdict(seq, Verdict.newBuilder().setCancelled(false).build());
     }
 

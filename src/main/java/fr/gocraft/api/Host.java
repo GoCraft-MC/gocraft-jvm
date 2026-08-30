@@ -17,6 +17,24 @@ public interface Host {
     /// The plugin's own id, from its manifest.
     String pluginId();
 
+    /// Registers an object whose @Subscribe methods should receive events.
+    ///
+    /// Handlers rarely belong on the plugin itself. §05 keeps them on their own
+    /// listener — `new ProtectionListener(config)` — precisely so they can be
+    /// unit-tested with no server and no runtime, and this is how such an
+    /// object reaches the dispatcher. The plugin instance is registered for you
+    /// if it carries handlers of its own.
+    ///
+    /// Call it from `enable()`. The host reports what a plugin registered as
+    /// soon as loading finishes, and checks it against the manifest; a listener
+    /// registered later subscribing to a type the manifest never declared will
+    /// never be dispatched, because the host routes from the manifest alone.
+    ///
+    /// @throws IllegalArgumentException if the object has no handler, is
+    ///         already registered, or a method takes something that is not an
+    ///         event this runtime knows.
+    void registerListener(Object listener);
+
     /// Writes a line to the server console.
     ///
     /// The runtime's output is routed to the server's own, so this lands in the
