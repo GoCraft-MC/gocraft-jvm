@@ -57,7 +57,8 @@ final class PluginRegistry implements AutoCloseable {
             return Envelopes.fail(seq, id, "already loaded");
         }
         try {
-            LoadedPlugin loaded = loader.load(id, request.getBundlePath(), request.getEntry());
+            LoadedPlugin loaded = loader.load(id, request.getBundlePath(), request.getEntry(),
+                    request.getDataDirectory());
             plugins.put(id, loaded);
             // What the plugin actually registered. The host checks it against
             // the manifest it validated and refuses anything undeclared, which

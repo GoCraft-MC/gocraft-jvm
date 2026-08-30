@@ -50,7 +50,8 @@ final class PluginLoader {
         }
     }
 
-    LoadedPlugin load(String pluginId, String bundlePath, String entry) throws LoadFailure {
+    LoadedPlugin load(String pluginId, String bundlePath, String entry, String dataDirectory)
+            throws LoadFailure {
         if (entry == null || entry.isBlank()) {
             // §05 makes the main class optional, but only once the runtime can
             // find annotated classes on its own. Until then there is nothing to
@@ -68,7 +69,7 @@ final class PluginLoader {
             // Built before the plugin, because the Host it is constructed with
             // has to be able to take a listener during enable().
             Subscriptions subscriptions = new Subscriptions();
-            Plugin instance = instantiate(loader, pluginId, entry, subscriptions);
+            Plugin instance = instantiate(loader, pluginId, entry, subscriptions, dataDirectory);
             registerOwnHandlers(instance, subscriptions);
             LoadedPlugin loaded = new LoadedPlugin(pluginId, loader, extracted, instance, subscriptions);
             enable(loaded);
@@ -190,7 +191,7 @@ final class PluginLoader {
     /// asked for a DataStore before the ABI can carry one deserves to be told
     /// that, not to see a NoSuchMethodException.
     private Plugin instantiate(PluginClassLoader loader, String pluginId, String entry,
-            Subscriptions subscriptions) throws LoadFailure {
+            Subscriptions subscriptions, String dataDirectory) throws LoadFailure {
         Class<?> type;
         try {
             type = Class.forName(entry, false, loader);
@@ -209,7 +210,7 @@ final class PluginLoader {
                     + "which to inject");
         }
         Constructor<?> constructor = constructors[0];
-        Object[] arguments = resolve(constructor, pluginId, entry, subscriptions);
+        Object[] arguments = resolve(constructor, pluginId, entry, subscriptions, dataDirectory);
         try {
             constructor.setAccessible(true);
             return (Plugin) constructor.newInstance(arguments);
@@ -222,12 +223,12 @@ final class PluginLoader {
     }
 
     private Object[] resolve(Constructor<?> constructor, String pluginId, String entry,
-            Subscriptions subscriptions) throws LoadFailure {
+            Subscriptions subscriptions, String dataDirectory) throws LoadFailure {
         Class<?>[] parameters = constructor.getParameterTypes();
         Object[] arguments = new Object[parameters.length];
         for (int index = 0; index < parameters.length; index++) {
             if (parameters[index] == Host.class) {
-                arguments[index] = new RuntimeHost(pluginId, subscriptions);
+                arguments[index] = new RuntimeHost(pluginId, subscriptions, dataDirectory);
                 continue;
             }
             throw new LoadFailure(entry + " asks for a " + parameters[index].getName()
@@ -242,10 +243,28 @@ final class PluginLoader {
     /// It writes to the runtime's own output, which the server routes into its
     /// console and latest.log, so a plugin's line appears beside the server's
     /// with the plugin that wrote it named.
-    private record RuntimeHost(String pluginId, Subscriptions subscriptions) implements Host {
+    /// The component is named `data` and not `dataDirectory` on purpose: a
+    /// record's accessor has to return its component's type, and the Host
+    /// contract hands a plugin a Path rather than the raw string the wire
+    /// carries. Naming them alike would make dataDirectory() an illegal
+    /// override rather than a conversion.
+    private record RuntimeHost(String pluginId, Subscriptions subscriptions, String data)
+            implements Host {
         @Override
         public void log(String message) {
             System.out.println("[" + pluginId + "] " + message);
+        }
+
+        /// Refusing beats inventing a path. A plugin handed a directory the host
+        /// does not know about would write a configuration nobody reads and lose
+        /// it on the next restart.
+        @Override
+        public java.nio.file.Path dataDirectory() {
+            if (data == null || data.isBlank()) {
+                throw new IllegalStateException("the host did not send a data directory for "
+                        + pluginId + "; it may be older than this runtime");
+            }
+            return java.nio.file.Path.of(data);
         }
 
         /// Refusing loudly rather than dropping the listener: a subscription

@@ -17,6 +17,23 @@ public interface Host {
     /// The plugin's own id, from its manifest.
     String pluginId();
 
+    /// Where this plugin's own files live.
+    ///
+    /// The host creates it, seeds it from the bundle's `config/` on first load,
+    /// and never overwrites what an admin edited afterwards. It belongs to this
+    /// plugin alone: two plugins shipping a `config.yml` do not collide.
+    ///
+    /// The path is given, not derived. A plugin computing its own would compute
+    /// a different one from the host the day either changed its mind, and would
+    /// then read a configuration nobody is editing.
+    ///
+    /// Unlike memory, what is written here survives a runtime respawn.
+    ///
+    /// @throws IllegalStateException when the host did not send one — an older
+    ///         host, or one that loaded this plugin without preparing its data.
+    ///         Better than a made-up path a plugin would silently write into.
+    java.nio.file.Path dataDirectory();
+
     /// Registers an object whose @Subscribe methods should receive events.
     ///
     /// Handlers rarely belong on the plugin itself. §05 keeps them on their own
