@@ -83,7 +83,9 @@ public final class Main {
             return EXIT_ABI_MISMATCH;
         }
 
-        return loop(connection, new PluginRegistry());
+        try (PluginRegistry registry = new PluginRegistry()) {
+            return loop(connection, registry);
+        }
     }
 
     /// The reader loop routes and nothing else.

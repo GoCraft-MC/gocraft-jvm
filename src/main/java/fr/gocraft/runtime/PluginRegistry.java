@@ -1,11 +1,11 @@
 package fr.gocraft.runtime;
 
 import fr.gocraft.abi.v1.Envelope;
-import fr.gocraft.abi.v1.Fail;
 import fr.gocraft.abi.v1.Load;
 import fr.gocraft.abi.v1.Unload;
 import fr.gocraft.abi.v1.Verdict;
 
+import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Map;
@@ -13,73 +13,108 @@ import java.util.concurrent.ConcurrentHashMap;
 
 /// Holds the loaded plugins.
 ///
-/// This slice loads none. Classloading, the constructor injection of §05 and
-/// the dispatch path are the next milestone; what exists here is the part that
-/// has to be right first — every LOAD is answered, and answered with a reason
-/// an admin can act on.
-///
 /// Per-plugin FAIL rather than a global crash is what makes an external runtime
 /// tolerable to operate: one plugin with a bad bundle disables itself and the
-/// others still run.
-final class PluginRegistry {
+/// others still run. So every LOAD is answered, and answered with a reason an
+/// admin can act on — silence would hold the host's boot open until it timed
+/// out, saying nothing about why.
+final class PluginRegistry implements AutoCloseable {
 
-    private final Map<String, String> loaded = new ConcurrentHashMap<>();
+    private final Map<String, LoadedPlugin> plugins = new ConcurrentHashMap<>();
+    private final PluginLoader loader;
+
+    PluginRegistry() {
+        this(defaultWorkDirectory());
+    }
+
+    PluginRegistry(Path workDirectory) {
+        this.loader = new PluginLoader(workDirectory);
+    }
+
+    private static Path defaultWorkDirectory() {
+        try {
+            return Files.createTempDirectory("gocraft-runtime");
+        } catch (IOException failure) {
+            throw new IllegalStateException("no writable temporary directory", failure);
+        }
+    }
 
     /// Brings up one plugin, or explains why it could not.
     ///
-    /// The reason travels to the admin verbatim, so it names the bundle and the
-    /// thing that was missing rather than the exception type.
+    /// LOAD is handled inline on the reader thread rather than handed to a
+    /// virtual thread, because load order is derived from the dependency graph
+    /// and a plugin may rely on an earlier one already being up. The host sends
+    /// them one at a time and waits for each.
     Envelope load(long seq, Load request) {
         String id = request.getPluginId();
-        String reason = reject(request);
-        if (reason != null) {
-            return Envelopes.fail(seq, id, reason);
+        if (id.isBlank()) {
+            return Envelopes.fail(seq, id, "the host sent a LOAD with no plugin id");
         }
-        loaded.put(id, request.getBundlePath());
-        // Unreachable in this slice: reject() has no path that accepts a
-        // bundle yet. It is written this way so the shape of the answer is
-        // settled before the loading is.
-        return Envelopes.loaded(seq, id);
+        if (plugins.containsKey(id)) {
+            return Envelopes.fail(seq, id, "already loaded");
+        }
+        try {
+            LoadedPlugin loaded = loader.load(id, request.getBundlePath(), request.getEntry());
+            plugins.put(id, loaded);
+            // No events are reported: subscriptions come from the manifest the
+            // host already validated, and this runtime registers none of its
+            // own yet. Claiming one it cannot deliver would be worse than
+            // claiming none.
+            return Envelopes.loaded(seq, id);
+        } catch (PluginLoader.LoadFailure failure) {
+            return Envelopes.fail(seq, id, failure.getMessage());
+        }
     }
 
-    private String reject(Load request) {
-        if (request.getPluginId().isBlank()) {
-            return "the host sent a LOAD with no plugin id";
-        }
-        String path = request.getBundlePath();
-        if (path.isBlank()) {
-            return "no bundle path";
-        }
-        if (!Files.isRegularFile(Path.of(path))) {
-            return "bundle " + path + " is not a readable file";
-        }
-        return "this runtime build loads no plugins yet: it speaks the ABI, "
-                + "but classloading and the plugin API are the next milestone";
-    }
-
-    void unload(Unload request) {
-        loaded.remove(request.getPluginId());
-    }
-
-    /// Answers a dispatch for a plugin that is not loaded.
+    /// Drops one plugin and everything it holds.
     ///
-    /// Nothing can be dispatched in this slice, because nothing loads — but the
-    /// host blocks its tick on a verdict, so silence here would burn the whole
-    /// event budget before the event resolved. Answering without cancelling
-    /// leaves the outcome to the other subscribers.
+    /// The schema carries no acknowledgement for UNLOAD, so a failure here goes
+    /// to the console: the host is not waiting on an answer and inventing one
+    /// would be inventing protocol.
+    void unload(Unload request) {
+        LoadedPlugin loaded = plugins.remove(request.getPluginId());
+        if (loaded == null) {
+            return;
+        }
+        try {
+            loaded.close();
+        } catch (IOException failure) {
+            System.err.println("gocraft-runtime: unloading " + request.getPluginId()
+                    + ": " + failure.getMessage());
+        }
+    }
+
+    /// Answers a dispatch.
+    ///
+    /// Nothing subscribes yet, so this always allows. It answers rather than
+    /// staying silent because the host blocks its tick on a verdict: saying
+    /// nothing burns the whole shared event budget before the event resolves,
+    /// and charges it to subscribers that never ran.
     Envelope dispatch(long seq, String pluginId) {
         return Envelopes.verdict(seq, Verdict.newBuilder().setCancelled(false).build());
     }
 
     boolean isLoaded(String pluginId) {
-        return loaded.containsKey(pluginId);
+        return plugins.containsKey(pluginId);
+    }
+
+    LoadedPlugin get(String pluginId) {
+        return plugins.get(pluginId);
     }
 
     int size() {
-        return loaded.size();
+        return plugins.size();
     }
 
-    static Fail failure(String pluginId, String reason) {
-        return Fail.newBuilder().setPluginId(pluginId).setReason(reason).build();
+    /// Unloads everything, in the face of a plugin that throws on the way out.
+    ///
+    /// One bad `disable()` must not keep the others loaded: the process is
+    /// going away either way, and a classloader left alive matters less than a
+    /// plugin never told to stop.
+    @Override
+    public void close() {
+        for (String id : Map.copyOf(plugins).keySet()) {
+            unload(Unload.newBuilder().setPluginId(id).build());
+        }
     }
 }
