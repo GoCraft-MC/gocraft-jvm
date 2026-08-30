@@ -22,10 +22,15 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class PluginLoadingTest {
 
     private static Load load(String id, Path bundle, String entry) {
+        return load(id, bundle, entry, "");
+    }
+
+    private static Load load(String id, Path bundle, String entry, String data) {
         return Load.newBuilder()
                 .setPluginId(id)
                 .setBundlePath(bundle.toString())
                 .setEntry(entry)
+                .setDataDirectory(data)
                 .build();
     }
 
@@ -276,5 +281,81 @@ class PluginLoadingTest {
 
         assertEquals("yes", System.getProperty(marker + ".disabled"));
         assertEquals(0, registry.size());
+    }
+
+    /// The host creates the directory, seeds it from the bundle and hands over
+    /// the path. A plugin deriving its own would derive a different one the day
+    /// either side changed its mind, and would then read a configuration nobody
+    /// is editing.
+    @Test
+    void aPluginIsToldWhereItsFilesLive(@TempDir Path directory) throws Exception {
+        String marker = "gc.test.data";
+        Path data = Files.createDirectories(directory.resolve("plugin-data"));
+        String source = """
+                package test.plugin;
+
+                import fr.gocraft.api.Host;
+                import fr.gocraft.api.Plugin;
+
+                public final class DataPlugin implements Plugin {
+                    private final Host host;
+
+                    public DataPlugin(Host host) {
+                        this.host = host;
+                    }
+
+                    @Override
+                    public void enable() {
+                        System.setProperty("%s.dir", host.dataDirectory().toString());
+                    }
+                }
+                """.formatted(marker);
+        Path bundle = TestBundles.bundle(directory, "DataPlugin", source);
+        System.clearProperty(marker + ".dir");
+
+        try (PluginRegistry registry = new PluginRegistry(Files.createDirectories(directory.resolve("work")))) {
+            Envelope reply = registry.load(1,
+                    load("dev.example.data", bundle, "test.plugin.DataPlugin", data.toString()));
+
+            assertTrue(reply.hasLoaded(), () -> reply.getFail().getReason());
+            assertEquals(data.toString(), System.getProperty(marker + ".dir"));
+        }
+    }
+
+    /// A host that sent no directory gets a refusal rather than a made-up path.
+    /// A plugin handed one the host does not know about would write a
+    /// configuration nobody reads and lose it on the next restart.
+    @Test
+    void refusesToInventADataDirectory(@TempDir Path directory) throws Exception {
+        String source = """
+                package test.plugin;
+
+                import fr.gocraft.api.Host;
+                import fr.gocraft.api.Plugin;
+
+                public final class NoDataPlugin implements Plugin {
+                    private final Host host;
+
+                    public NoDataPlugin(Host host) {
+                        this.host = host;
+                    }
+
+                    @Override
+                    public void enable() {
+                        host.dataDirectory();
+                    }
+                }
+                """;
+        Path bundle = TestBundles.bundle(directory, "NoDataPlugin", source);
+
+        try (PluginRegistry registry = new PluginRegistry(Files.createDirectories(directory.resolve("work")))) {
+            // No data directory: an older host, or one that loaded without
+            // preparing the plugin's files.
+            Envelope reply = registry.load(1, load("dev.example.data", bundle, "test.plugin.NoDataPlugin"));
+
+            assertTrue(reply.hasFail());
+            assertTrue(reply.getFail().getReason().contains("data directory"),
+                    reply.getFail().getReason());
+        }
     }
 }
