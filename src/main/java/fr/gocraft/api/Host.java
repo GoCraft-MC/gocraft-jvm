@@ -52,6 +52,26 @@ public interface Host {
     ///         event this runtime knows.
     void registerListener(Object listener);
 
+    /// Binds code to one of this plugin's commands.
+    ///
+    /// The path is the one through the command tree the bundle shipped, with
+    /// arguments in angle brackets — "shop sell <price>", "region define
+    /// <name>" — and not the executor id the tree assigned.
+    /// Ids belong to whatever built the bundle, so naming one here would be a
+    /// second place they are written down, free to disagree with the first the
+    /// day the tree is rebuilt.
+    ///
+    /// Call it from `enable()`. The host already knows every command from the
+    /// manifest and has told every client about them before this JVM started,
+    /// so registering late does not add a command — it only decides whether the
+    /// one already advertised does anything.
+    ///
+    /// @throws IllegalArgumentException if this plugin's tree has no such path,
+    ///         or something is already bound to it. Both are refused rather
+    ///         than accepted: a handler that never runs is indistinguishable
+    ///         from a command that does not work.
+    void registerCommand(String path, CommandHandler handler);
+
     /// Writes a line to the server console.
     ///
     /// The runtime's output is routed to the server's own, so this lands in the
