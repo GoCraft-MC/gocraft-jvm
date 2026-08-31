@@ -41,6 +41,8 @@ public  final class Envelope extends
     PING(11),
     PONG(12),
     SHUTDOWN(13),
+    INVOKE(14),
+    INVOKED(15),
     BODY_NOT_SET(0);
     private final int value;
     private BodyCase(int value) {
@@ -68,6 +70,8 @@ public  final class Envelope extends
         case 11: return PING;
         case 12: return PONG;
         case 13: return SHUTDOWN;
+        case 14: return INVOKE;
+        case 15: return INVOKED;
         case 0: return BODY_NOT_SET;
         default: return null;
       }
@@ -800,6 +804,126 @@ public  final class Envelope extends
    */
   private void clearShutdown() {
     if (bodyCase_ == 13) {
+      bodyCase_ = 0;
+      body_ = null;
+    }
+  }
+
+  public static final int INVOKE_FIELD_NUMBER = 14;
+  /**
+   * <pre>
+   * Command invocation. Not the hot path: a person typing, at typing speed.
+   * </pre>
+   *
+   * <code>.gocraft.abi.v1.Invoke invoke = 14 [json_name = "invoke"];</code>
+   */
+  @java.lang.Override
+  public boolean hasInvoke() {
+    return bodyCase_ == 14;
+  }
+  /**
+   * <pre>
+   * Command invocation. Not the hot path: a person typing, at typing speed.
+   * </pre>
+   *
+   * <code>.gocraft.abi.v1.Invoke invoke = 14 [json_name = "invoke"];</code>
+   */
+  @java.lang.Override
+  public fr.gocraft.abi.v1.Invoke getInvoke() {
+    if (bodyCase_ == 14) {
+       return (fr.gocraft.abi.v1.Invoke) body_;
+    }
+    return fr.gocraft.abi.v1.Invoke.getDefaultInstance();
+  }
+  /**
+   * <pre>
+   * Command invocation. Not the hot path: a person typing, at typing speed.
+   * </pre>
+   *
+   * <code>.gocraft.abi.v1.Invoke invoke = 14 [json_name = "invoke"];</code>
+   */
+  private void setInvoke(fr.gocraft.abi.v1.Invoke value) {
+    java.util.Objects.requireNonNull(value);
+    body_ = value;
+    bodyCase_ = 14;
+  }
+  /**
+   * <pre>
+   * Command invocation. Not the hot path: a person typing, at typing speed.
+   * </pre>
+   *
+   * <code>.gocraft.abi.v1.Invoke invoke = 14 [json_name = "invoke"];</code>
+   */
+  private void mergeInvoke(fr.gocraft.abi.v1.Invoke value) {
+    java.util.Objects.requireNonNull(value);
+    if (bodyCase_ == 14 &&
+        body_ != fr.gocraft.abi.v1.Invoke.getDefaultInstance()) {
+      body_ = fr.gocraft.abi.v1.Invoke.newBuilder((fr.gocraft.abi.v1.Invoke) body_)
+          .mergeFrom(value).buildPartial();
+    } else {
+      body_ = value;
+    }
+    bodyCase_ = 14;
+  }
+  /**
+   * <pre>
+   * Command invocation. Not the hot path: a person typing, at typing speed.
+   * </pre>
+   *
+   * <code>.gocraft.abi.v1.Invoke invoke = 14 [json_name = "invoke"];</code>
+   */
+  private void clearInvoke() {
+    if (bodyCase_ == 14) {
+      bodyCase_ = 0;
+      body_ = null;
+    }
+  }
+
+  public static final int INVOKED_FIELD_NUMBER = 15;
+  /**
+   * <code>.gocraft.abi.v1.Invoked invoked = 15 [json_name = "invoked"];</code>
+   */
+  @java.lang.Override
+  public boolean hasInvoked() {
+    return bodyCase_ == 15;
+  }
+  /**
+   * <code>.gocraft.abi.v1.Invoked invoked = 15 [json_name = "invoked"];</code>
+   */
+  @java.lang.Override
+  public fr.gocraft.abi.v1.Invoked getInvoked() {
+    if (bodyCase_ == 15) {
+       return (fr.gocraft.abi.v1.Invoked) body_;
+    }
+    return fr.gocraft.abi.v1.Invoked.getDefaultInstance();
+  }
+  /**
+   * <code>.gocraft.abi.v1.Invoked invoked = 15 [json_name = "invoked"];</code>
+   */
+  private void setInvoked(fr.gocraft.abi.v1.Invoked value) {
+    java.util.Objects.requireNonNull(value);
+    body_ = value;
+    bodyCase_ = 15;
+  }
+  /**
+   * <code>.gocraft.abi.v1.Invoked invoked = 15 [json_name = "invoked"];</code>
+   */
+  private void mergeInvoked(fr.gocraft.abi.v1.Invoked value) {
+    java.util.Objects.requireNonNull(value);
+    if (bodyCase_ == 15 &&
+        body_ != fr.gocraft.abi.v1.Invoked.getDefaultInstance()) {
+      body_ = fr.gocraft.abi.v1.Invoked.newBuilder((fr.gocraft.abi.v1.Invoked) body_)
+          .mergeFrom(value).buildPartial();
+    } else {
+      body_ = value;
+    }
+    bodyCase_ = 15;
+  }
+  /**
+   * <code>.gocraft.abi.v1.Invoked invoked = 15 [json_name = "invoked"];</code>
+   */
+  private void clearInvoked() {
+    if (bodyCase_ == 15) {
       bodyCase_ = 0;
       body_ = null;
     }
@@ -1635,6 +1759,126 @@ public  final class Envelope extends
       return this;
     }
 
+    /**
+     * <pre>
+     * Command invocation. Not the hot path: a person typing, at typing speed.
+     * </pre>
+     *
+     * <code>.gocraft.abi.v1.Invoke invoke = 14 [json_name = "invoke"];</code>
+     */
+    @java.lang.Override
+    public boolean hasInvoke() {
+      return instance.hasInvoke();
+    }
+    /**
+     * <pre>
+     * Command invocation. Not the hot path: a person typing, at typing speed.
+     * </pre>
+     *
+     * <code>.gocraft.abi.v1.Invoke invoke = 14 [json_name = "invoke"];</code>
+     */
+    @java.lang.Override
+    public fr.gocraft.abi.v1.Invoke getInvoke() {
+      return instance.getInvoke();
+    }
+    /**
+     * <pre>
+     * Command invocation. Not the hot path: a person typing, at typing speed.
+     * </pre>
+     *
+     * <code>.gocraft.abi.v1.Invoke invoke = 14 [json_name = "invoke"];</code>
+     */
+    public Builder setInvoke(fr.gocraft.abi.v1.Invoke value) {
+      copyOnWrite();
+      instance.setInvoke(value);
+      return this;
+    }
+    /**
+     * <pre>
+     * Command invocation. Not the hot path: a person typing, at typing speed.
+     * </pre>
+     *
+     * <code>.gocraft.abi.v1.Invoke invoke = 14 [json_name = "invoke"];</code>
+     */
+    public Builder setInvoke(
+        fr.gocraft.abi.v1.Invoke.Builder builderForValue) {
+      copyOnWrite();
+      instance.setInvoke(builderForValue.build());
+      return this;
+    }
+    /**
+     * <pre>
+     * Command invocation. Not the hot path: a person typing, at typing speed.
+     * </pre>
+     *
+     * <code>.gocraft.abi.v1.Invoke invoke = 14 [json_name = "invoke"];</code>
+     */
+    public Builder mergeInvoke(fr.gocraft.abi.v1.Invoke value) {
+      copyOnWrite();
+      instance.mergeInvoke(value);
+      return this;
+    }
+    /**
+     * <pre>
+     * Command invocation. Not the hot path: a person typing, at typing speed.
+     * </pre>
+     *
+     * <code>.gocraft.abi.v1.Invoke invoke = 14 [json_name = "invoke"];</code>
+     */
+    public Builder clearInvoke() {
+      copyOnWrite();
+      instance.clearInvoke();
+      return this;
+    }
+
+    /**
+     * <code>.gocraft.abi.v1.Invoked invoked = 15 [json_name = "invoked"];</code>
+     */
+    @java.lang.Override
+    public boolean hasInvoked() {
+      return instance.hasInvoked();
+    }
+    /**
+     * <code>.gocraft.abi.v1.Invoked invoked = 15 [json_name = "invoked"];</code>
+     */
+    @java.lang.Override
+    public fr.gocraft.abi.v1.Invoked getInvoked() {
+      return instance.getInvoked();
+    }
+    /**
+     * <code>.gocraft.abi.v1.Invoked invoked = 15 [json_name = "invoked"];</code>
+     */
+    public Builder setInvoked(fr.gocraft.abi.v1.Invoked value) {
+      copyOnWrite();
+      instance.setInvoked(value);
+      return this;
+    }
+    /**
+     * <code>.gocraft.abi.v1.Invoked invoked = 15 [json_name = "invoked"];</code>
+     */
+    public Builder setInvoked(
+        fr.gocraft.abi.v1.Invoked.Builder builderForValue) {
+      copyOnWrite();
+      instance.setInvoked(builderForValue.build());
+      return this;
+    }
+    /**
+     * <code>.gocraft.abi.v1.Invoked invoked = 15 [json_name = "invoked"];</code>
+     */
+    public Builder mergeInvoked(fr.gocraft.abi.v1.Invoked value) {
+      copyOnWrite();
+      instance.mergeInvoked(value);
+      return this;
+    }
+    /**
+     * <code>.gocraft.abi.v1.Invoked invoked = 15 [json_name = "invoked"];</code>
+     */
+    public Builder clearInvoked() {
+      copyOnWrite();
+      instance.clearInvoked();
+      return this;
+    }
+
     // @@protoc_insertion_point(builder_scope:gocraft.abi.v1.Envelope)
   }
   @java.lang.Override
@@ -1666,11 +1910,13 @@ public  final class Envelope extends
             fr.gocraft.abi.v1.Ping.class,
             fr.gocraft.abi.v1.Pong.class,
             fr.gocraft.abi.v1.Shutdown.class,
+            fr.gocraft.abi.v1.Invoke.class,
+            fr.gocraft.abi.v1.Invoked.class,
           };
           java.lang.String info =
-              "\u0000\r\u0001\u0000\u0001\r\r\u0000\u0000\u0000\u0001\u0003\u0002<\u0000\u0003<" +
-              "\u0000\u0004<\u0000\u0005<\u0000\u0006<\u0000\u0007<\u0000\b<\u0000\t<\u0000\n<\u0000" +
-              "\u000b<\u0000\f<\u0000\r<\u0000";
+              "\u0000\u000f\u0001\u0000\u0001\u000f\u000f\u0000\u0000\u0000\u0001\u0003\u0002<\u0000" +
+              "\u0003<\u0000\u0004<\u0000\u0005<\u0000\u0006<\u0000\u0007<\u0000\b<\u0000\t<\u0000" +
+              "\n<\u0000\u000b<\u0000\f<\u0000\r<\u0000\u000e<\u0000\u000f<\u0000";
           return newMessageInfo(DEFAULT_INSTANCE, info, objects);
       }
       case GET_DEFAULT_INSTANCE: {

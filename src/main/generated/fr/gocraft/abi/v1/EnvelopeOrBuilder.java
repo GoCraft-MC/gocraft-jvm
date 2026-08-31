@@ -184,5 +184,35 @@ public interface EnvelopeOrBuilder extends
    */
   fr.gocraft.abi.v1.Shutdown getShutdown();
 
+  /**
+   * <pre>
+   * Command invocation. Not the hot path: a person typing, at typing speed.
+   * </pre>
+   *
+   * <code>.gocraft.abi.v1.Invoke invoke = 14 [json_name = "invoke"];</code>
+   * @return Whether the invoke field is set.
+   */
+  boolean hasInvoke();
+  /**
+   * <pre>
+   * Command invocation. Not the hot path: a person typing, at typing speed.
+   * </pre>
+   *
+   * <code>.gocraft.abi.v1.Invoke invoke = 14 [json_name = "invoke"];</code>
+   * @return The invoke.
+   */
+  fr.gocraft.abi.v1.Invoke getInvoke();
+
+  /**
+   * <code>.gocraft.abi.v1.Invoked invoked = 15 [json_name = "invoked"];</code>
+   * @return Whether the invoked field is set.
+   */
+  boolean hasInvoked();
+  /**
+   * <code>.gocraft.abi.v1.Invoked invoked = 15 [json_name = "invoked"];</code>
+   * @return The invoked.
+   */
+  fr.gocraft.abi.v1.Invoked getInvoked();
+
   public fr.gocraft.abi.v1.Envelope.BodyCase getBodyCase();
 }
