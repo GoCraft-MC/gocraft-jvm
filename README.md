@@ -75,13 +75,14 @@ The jar lands in `build/libs/gocraft-runtime.jar`, around 1.1 MB.
 
 The runtime is spawned by the server and never started by hand — the host opens
 the socket first, so there is no window in which this could race a listener that
-does not exist. Point a GoCraft test server at a local build:
+does not exist. Point a GoCraft test server at a local build, with an absolute
+path or one relative to the server's working directory:
 
 ```yaml
 plugins:
   runtimes:
     jvm:
-      jar_path: ../gocraft-jvm/build/libs/gocraft-runtime.jar
+      jar_path: /path/to/gocraft-jvm/build/libs/gocraft-runtime.jar
 ```
 
 ## The ABI
