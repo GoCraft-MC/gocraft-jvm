@@ -1,5 +1,10 @@
 package fr.gocraft.runtime;
 
+import fr.gocraft.abi.v1.CommandArgumentType;
+import fr.gocraft.abi.v1.CommandNode;
+import fr.gocraft.abi.v1.CommandNodeKind;
+import fr.gocraft.abi.v1.CommandTree;
+
 import javax.tools.JavaCompiler;
 import javax.tools.ToolProvider;
 import java.io.IOException;
@@ -92,6 +97,54 @@ final class TestBundles {
             }
         }
         return pack(directory.resolve(className + ".gcpkg"), List.of(entry("payload/plugin.jar", jar)));
+    }
+
+    /// The same, plus a serialised command tree at `commands.pb`.
+    ///
+    /// The tree is built here rather than checked in because the executor ids
+    /// are the whole point of the file: a handler binds by path and the runtime
+    /// resolves the id out of this, so a fixture with stale ids would test the
+    /// fixture rather than the resolution.
+    static Path bundleWithCommands(Path directory, String className, String source,
+            CommandTree tree) throws IOException {
+        Path bundle = bundle(directory, className, source);
+        Path treeFile = directory.resolve("commands.pb");
+        Files.write(treeFile, tree.toByteArray());
+        // Repacked rather than appended: a zip entry cannot be added to a
+        // finished archive without rewriting it, and the jar is already inside.
+        Path jar = directory.resolve("plugin.jar");
+        return pack(bundle, List.of(entry("payload/plugin.jar", jar),
+                entry("commands.pb", treeFile)));
+    }
+
+    /// One literal with an executor, optionally under a parent literal, which
+    /// is the shape `gocraft-cli` writes for `[commands] tree = "commands.pb"`.
+    static CommandNode literal(String name, int executor, CommandNode... children) {
+        CommandNode.Builder node = CommandNode.newBuilder()
+                .setKind(CommandNodeKind.COMMAND_NODE_KIND_LITERAL)
+                .setName(name)
+                .setExecutor(executor);
+        for (CommandNode child : children) {
+            node.addChildren(child);
+        }
+        return node.build();
+    }
+
+    static CommandNode argument(String name, CommandArgumentType type, int executor) {
+        return CommandNode.newBuilder()
+                .setKind(CommandNodeKind.COMMAND_NODE_KIND_ARGUMENT)
+                .setName(name)
+                .setArgumentType(type)
+                .setExecutor(executor)
+                .build();
+    }
+
+    static CommandTree tree(CommandNode... roots) {
+        CommandTree.Builder builder = CommandTree.newBuilder().setVersion(1);
+        for (CommandNode root : roots) {
+            builder.addChildren(root);
+        }
+        return builder.build();
     }
 
     /// A bundle with a manifest and no payload at all, which is what the host's
