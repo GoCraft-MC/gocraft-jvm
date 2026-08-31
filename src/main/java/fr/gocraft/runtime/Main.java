@@ -2,6 +2,7 @@ package fr.gocraft.runtime;
 
 import fr.gocraft.abi.v1.Dispatch;
 import fr.gocraft.abi.v1.Envelope;
+import fr.gocraft.abi.v1.Invoke;
 import fr.gocraft.abi.v1.Welcome;
 
 import java.io.EOFException;
@@ -127,6 +128,22 @@ public final class Main {
                             connection.send(reply);
                         } catch (IOException lost) {
                             System.err.println("gocraft-runtime: could not answer a dispatch: "
+                                    + lost.getMessage());
+                        }
+                    });
+                }
+                // On a virtual thread too, and for a second reason beyond the
+                // one above: a command handler is allowed to take its time —
+                // nobody is holding the tick — so it must not be what stops
+                // the next event being read.
+                case INVOKE -> {
+                    Invoke request = envelope.getInvoke();
+                    Thread.ofVirtual().start(() -> {
+                        Envelope reply = registry.invoke(seq, request);
+                        try {
+                            connection.send(reply);
+                        } catch (IOException lost) {
+                            System.err.println("gocraft-runtime: could not answer a command: "
                                     + lost.getMessage());
                         }
                     });

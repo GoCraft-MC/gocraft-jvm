@@ -3,6 +3,7 @@ package fr.gocraft.runtime;
 import fr.gocraft.abi.v1.Envelope;
 import fr.gocraft.abi.v1.Fail;
 import fr.gocraft.abi.v1.Hello;
+import fr.gocraft.abi.v1.Invoked;
 import fr.gocraft.abi.v1.Loaded;
 import fr.gocraft.abi.v1.Pong;
 import fr.gocraft.abi.v1.Verdict;
@@ -45,6 +46,10 @@ final class Envelopes {
                 .setSeq(seq)
                 .setFail(Fail.newBuilder().setPluginId(pluginId).setReason(reason))
                 .build();
+    }
+
+    static Envelope invoked(long seq, Invoked invoked) {
+        return Envelope.newBuilder().setSeq(seq).setInvoked(invoked).build();
     }
 
     static Envelope verdict(long seq, Verdict verdict) {

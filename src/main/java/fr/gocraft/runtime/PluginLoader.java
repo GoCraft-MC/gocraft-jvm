@@ -1,5 +1,7 @@
 package fr.gocraft.runtime;
 
+import com.google.protobuf.InvalidProtocolBufferException;
+import fr.gocraft.abi.v1.CommandTree;
 import fr.gocraft.api.Host;
 import fr.gocraft.api.Plugin;
 
@@ -33,6 +35,10 @@ final class PluginLoader {
     /// libraries from Maven, and both go on the same classpath.
     private static final String PAYLOAD = "payload/";
 
+    /// The same 4 MiB the host reads a tree under. A bundle is untrusted input
+    /// and a tree is data, so it is bounded before it is parsed.
+    private static final int MAXIMUM_COMMAND_TREE = 4 << 20;
+
     private final Path workDirectory;
 
     PluginLoader(Path workDirectory) {
@@ -50,8 +56,8 @@ final class PluginLoader {
         }
     }
 
-    LoadedPlugin load(String pluginId, String bundlePath, String entry, String dataDirectory)
-            throws LoadFailure {
+    LoadedPlugin load(String pluginId, String bundlePath, String entry, String dataDirectory,
+            String commandTree) throws LoadFailure {
         if (entry == null || entry.isBlank()) {
             // §05 makes the main class optional, but only once the runtime can
             // find annotated classes on its own. Until then there is nothing to
@@ -69,10 +75,14 @@ final class PluginLoader {
             // Built before the plugin, because the Host it is constructed with
             // has to be able to take a listener during enable().
             Subscriptions subscriptions = new Subscriptions();
-            Plugin instance = instantiate(loader, pluginId, entry, subscriptions, dataDirectory);
+            CommandBindings commands = readCommands(bundlePath, commandTree);
+            Plugin instance = instantiate(loader, pluginId, entry, subscriptions, dataDirectory,
+                    commands);
             registerOwnHandlers(instance, subscriptions);
-            LoadedPlugin loaded = new LoadedPlugin(pluginId, loader, extracted, instance, subscriptions);
+            LoadedPlugin loaded = new LoadedPlugin(pluginId, loader, extracted, instance,
+                    subscriptions, commands);
             enable(loaded);
+            reportUnbound(pluginId, commands);
             return loaded;
         } catch (LoadFailure failure) {
             // Nothing half-loaded survives: a classloader left open on a plugin
@@ -82,6 +92,56 @@ final class PluginLoader {
         } catch (IOException failure) {
             discard(loader, extracted);
             throw new LoadFailure("reading bundle " + bundlePath + ": " + failure.getMessage(), failure);
+        }
+    }
+
+    /// Reads the command tree out of the bundle and indexes it by path.
+    ///
+    /// The tree is not sent over the wire — the host sends where it is, the way
+    /// it sends the entry class — because this process opens the bundle anyway
+    /// and a second copy would be free to disagree with the one handlers bind
+    /// against.
+    ///
+    /// A tree the host named and the bundle does not contain is a failure. The
+    /// host validated that bundle before sending it, so the mismatch means the
+    /// archive changed underneath, and loading a plugin whose commands cannot
+    /// bind would advertise commands that do nothing.
+    private CommandBindings readCommands(String bundlePath, String commandTree)
+            throws LoadFailure, IOException {
+        if (commandTree == null || commandTree.isBlank()) {
+            return CommandBindings.none();
+        }
+        try (ZipFile archive = new ZipFile(Path.of(bundlePath).toFile())) {
+            ZipEntry entry = archive.getEntry(commandTree);
+            if (entry == null) {
+                throw new LoadFailure("the manifest names a command tree at " + commandTree
+                        + ", which bundle " + bundlePath + " does not contain");
+            }
+            if (entry.getSize() > MAXIMUM_COMMAND_TREE) {
+                throw new LoadFailure("the command tree at " + commandTree + " is larger than "
+                        + MAXIMUM_COMMAND_TREE + " bytes");
+            }
+            try (InputStream source = archive.getInputStream(entry)) {
+                return CommandBindings.of(CommandTree.parseFrom(
+                        source.readNBytes(MAXIMUM_COMMAND_TREE)));
+            } catch (InvalidProtocolBufferException malformed) {
+                throw new LoadFailure("the command tree at " + commandTree
+                        + " is not a readable tree: " + malformed.getMessage(), malformed);
+            }
+        }
+    }
+
+    /// Names the commands a bundle promised and the plugin never bound.
+    ///
+    /// A warning rather than a failure: the host has already advertised them to
+    /// every connected client, so refusing the load now would take working
+    /// commands down with the missing ones. Somebody has to be told, though —
+    /// the alternative is a player typing a command that silently does nothing.
+    private static void reportUnbound(String pluginId, CommandBindings commands) {
+        List<String> unbound = commands.unbound();
+        if (!unbound.isEmpty()) {
+            System.err.println("gocraft-runtime: " + pluginId + " declares commands it never "
+                    + "registered a handler for: " + String.join(", ", unbound));
         }
     }
 
@@ -191,7 +251,8 @@ final class PluginLoader {
     /// asked for a DataStore before the ABI can carry one deserves to be told
     /// that, not to see a NoSuchMethodException.
     private Plugin instantiate(PluginClassLoader loader, String pluginId, String entry,
-            Subscriptions subscriptions, String dataDirectory) throws LoadFailure {
+            Subscriptions subscriptions, String dataDirectory, CommandBindings commands)
+            throws LoadFailure {
         Class<?> type;
         try {
             type = Class.forName(entry, false, loader);
@@ -210,7 +271,8 @@ final class PluginLoader {
                     + "which to inject");
         }
         Constructor<?> constructor = constructors[0];
-        Object[] arguments = resolve(constructor, pluginId, entry, subscriptions, dataDirectory);
+        Object[] arguments = resolve(constructor, pluginId, entry, subscriptions, dataDirectory,
+                commands);
         try {
             constructor.setAccessible(true);
             return (Plugin) constructor.newInstance(arguments);
@@ -223,12 +285,14 @@ final class PluginLoader {
     }
 
     private Object[] resolve(Constructor<?> constructor, String pluginId, String entry,
-            Subscriptions subscriptions, String dataDirectory) throws LoadFailure {
+            Subscriptions subscriptions, String dataDirectory, CommandBindings commands)
+            throws LoadFailure {
         Class<?>[] parameters = constructor.getParameterTypes();
         Object[] arguments = new Object[parameters.length];
         for (int index = 0; index < parameters.length; index++) {
             if (parameters[index] == Host.class) {
-                arguments[index] = new RuntimeHost(pluginId, subscriptions, dataDirectory);
+                arguments[index] = new RuntimeHost(pluginId, subscriptions, dataDirectory,
+                        commands);
                 continue;
             }
             throw new LoadFailure(entry + " asks for a " + parameters[index].getName()
@@ -248,8 +312,8 @@ final class PluginLoader {
     /// contract hands a plugin a Path rather than the raw string the wire
     /// carries. Naming them alike would make dataDirectory() an illegal
     /// override rather than a conversion.
-    private record RuntimeHost(String pluginId, Subscriptions subscriptions, String data)
-            implements Host {
+    private record RuntimeHost(String pluginId, Subscriptions subscriptions, String data,
+            CommandBindings commands) implements Host {
         @Override
         public void log(String message) {
             System.out.println("[" + pluginId + "] " + message);
@@ -265,6 +329,14 @@ final class PluginLoader {
                         + pluginId + "; it may be older than this runtime");
             }
             return java.nio.file.Path.of(data);
+        }
+
+        /// Refusing loudly for the same reason registerListener does: a handler
+        /// bound to a path the tree does not contain would never run, and a
+        /// command that does nothing is indistinguishable from a broken server.
+        @Override
+        public void registerCommand(String path, fr.gocraft.api.CommandHandler handler) {
+            commands.register(path, handler);
         }
 
         /// Refusing loudly rather than dropping the listener: a subscription

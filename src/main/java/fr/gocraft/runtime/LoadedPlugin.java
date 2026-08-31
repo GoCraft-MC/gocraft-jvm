@@ -24,15 +24,17 @@ final class LoadedPlugin implements AutoCloseable {
     private final PluginClassLoader loader;
     private final Path extracted;
     private final Subscriptions subscriptions;
+    private final CommandBindings commands;
     private Plugin instance;
 
     LoadedPlugin(String id, PluginClassLoader loader, Path extracted, Plugin instance,
-            Subscriptions subscriptions) {
+            Subscriptions subscriptions, CommandBindings commands) {
         this.id = id;
         this.loader = loader;
         this.extracted = extracted;
         this.instance = instance;
         this.subscriptions = subscriptions;
+        this.commands = commands;
     }
 
     String id() {
@@ -49,6 +51,10 @@ final class LoadedPlugin implements AutoCloseable {
 
     Subscriptions subscriptions() {
         return subscriptions;
+    }
+
+    CommandBindings commands() {
+        return commands;
     }
 
     /// Stops the plugin and releases everything it holds.
@@ -70,6 +76,10 @@ final class LoadedPlugin implements AutoCloseable {
         // which holds the classloader, which holds every class the plugin
         // defined — the leak is one forgotten handler wide.
         subscriptions.clear();
+        // A command handler is a lambda, and a lambda retains the class that
+        // declared it just as a Method does. §13 lists command invokers beside
+        // handlers for exactly this reason.
+        commands.clear();
         instance = null;
 
         try {

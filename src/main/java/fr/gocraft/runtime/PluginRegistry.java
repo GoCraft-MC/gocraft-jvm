@@ -2,15 +2,19 @@ package fr.gocraft.runtime;
 
 import fr.gocraft.abi.v1.Dispatch;
 import fr.gocraft.abi.v1.Envelope;
+import fr.gocraft.abi.v1.Invoke;
 import fr.gocraft.abi.v1.Load;
 import fr.gocraft.abi.v1.Unload;
 import fr.gocraft.abi.v1.Verdict;
+import fr.gocraft.api.CommandContext;
+import fr.gocraft.api.CommandHandler;
 import fr.gocraft.api.Event;
 import fr.gocraft.api.event.GeneratedEvents;
 
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -58,7 +62,7 @@ final class PluginRegistry implements AutoCloseable {
         }
         try {
             LoadedPlugin loaded = loader.load(id, request.getBundlePath(), request.getEntry(),
-                    request.getDataDirectory());
+                    request.getDataDirectory(), request.getCommandTree());
             plugins.put(id, loaded);
             // What the plugin actually registered. The host checks it against
             // the manifest it validated and refuses anything undeclared, which
@@ -115,6 +119,51 @@ final class PluginRegistry implements AutoCloseable {
                 System.err.println("gocraft-runtime: " + pluginId + " handler " + handler
                         + " threw " + thrown));
         return Envelopes.verdict(seq, EventCodec.verdict(event));
+    }
+
+    /// Runs one command in one plugin and answers.
+    ///
+    /// It always answers, like dispatch, and for a plainer reason: somebody is
+    /// looking at a chat prompt waiting for the line to do something. Silence
+    /// would leave them there until the host gave up.
+    ///
+    /// A handler that throws becomes the error the sender reads. That is why
+    /// the API documents throwing as a legitimate way to refuse — the message
+    /// travels — and why what is reported here is the exception's own message
+    /// rather than a stack trace nobody typing a command can act on. The trace
+    /// still goes to the runtime's output, where an admin can find it.
+    Envelope invoke(long seq, Invoke request) {
+        String pluginId = request.getPluginId();
+        LoadedPlugin loaded = plugins.get(pluginId);
+        if (loaded == null) {
+            return Envelopes.invoked(seq, CommandCodec.invoked(
+                    "plugin " + pluginId + " is not loaded in this runtime", List.of()));
+        }
+        CommandHandler handler = loaded.commands().handler(request.getExecutor());
+        if (handler == null) {
+            // The host routed a command this plugin declared and never bound.
+            // Reported by name because the manifest and the code disagree, and
+            // only one of them can be fixed by whoever reads this.
+            return Envelopes.invoked(seq, CommandCodec.invoked(
+                    "plugin " + pluginId + " has no handler for this command", List.of()));
+        }
+        CommandContext context = CommandCodec.context(request);
+        try {
+            handler.handle(context);
+        } catch (Exception | Error thrown) {
+            System.err.println("gocraft-runtime: " + pluginId + " command handler threw " + thrown);
+            return Envelopes.invoked(seq, CommandCodec.invoked(
+                    reason(thrown), context.effects()));
+        }
+        return Envelopes.invoked(seq, CommandCodec.invoked(null, context.effects()));
+    }
+
+    /// What the sender is shown. A message when the handler wrote one, the
+    /// class name when it threw something wordless — an NPE's message is null,
+    /// and "null" on a chat line tells nobody anything.
+    private static String reason(Throwable thrown) {
+        String message = thrown.getMessage();
+        return message == null || message.isBlank() ? thrown.getClass().getSimpleName() : message;
     }
 
     private static Envelope allow(long seq) {

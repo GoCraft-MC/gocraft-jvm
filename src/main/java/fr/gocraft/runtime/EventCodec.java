@@ -29,7 +29,10 @@ final class EventCodec {
         return read;
     }
 
-    private static fr.gocraft.api.Value value(Value wire) {
+    /// One value, in. Package-visible because commands read the same
+    /// shapes events do, and a second reader would be a second definition
+    /// of the vocabulary types free to drift from this one.
+    static fr.gocraft.api.Value value(Value wire) {
         return switch (wire.getKindCase()) {
             case BOOL_VALUE -> new fr.gocraft.api.Value.Bool(wire.getBoolValue());
             case INT64_VALUE -> new fr.gocraft.api.Value.Int(wire.getInt64Value());
@@ -61,7 +64,7 @@ final class EventCodec {
         return verdict.build();
     }
 
-    private static List<Value> wire(List<fr.gocraft.api.Value> values) {
+    public static List<Value> wire(List<fr.gocraft.api.Value> values) {
         List<Value> encoded = new ArrayList<>(values.size());
         for (fr.gocraft.api.Value value : values) {
             encoded.add(wire(value));
