@@ -203,7 +203,12 @@ class DispatchTest {
                     "effects are batched into the verdict; one event, one round trip");
             var effect = reply.getVerdict().getEffects(0);
             assertEquals("chat.message", effect.getType());
-            assertEquals("Protected area.", effect.getFields(0).getStringValue());
+            // The recipient travels with the message. Without it the host has a
+            // line and nobody to deliver it to, and would have to guess from
+            // whatever event happened to be in flight.
+            assertTrue(effect.getFields(0).hasListValue(),
+                    "a message carries the PlayerRef it is addressed to");
+            assertEquals("Protected area.", effect.getFields(1).getStringValue());
         }
     }
 
