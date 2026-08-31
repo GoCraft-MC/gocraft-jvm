@@ -25,6 +25,7 @@ public  final class Load extends
     bundlePath_ = "";
     entry_ = "";
     dataDirectory_ = "";
+    commandTree_ = "";
   }
   public static final int PLUGIN_ID_FIELD_NUMBER = 1;
   private java.lang.String pluginId_;
@@ -276,6 +277,108 @@ public  final class Load extends
       com.google.protobuf.ByteString value) {
     checkByteStringIsUtf8(value);
     dataDirectory_ = value.toStringUtf8();
+
+  }
+
+  public static final int COMMAND_TREE_FIELD_NUMBER = 5;
+  private java.lang.String commandTree_;
+  /**
+   * <pre>
+   * Where the command tree sits inside the bundle, from the manifest's
+   * [commands] tree. Empty when the plugin declares no commands.
+   *
+   * The path, not the tree. The runtime opens this bundle anyway, and the tree
+   * is what its executor ids are numbered by, so sending a copy would be a
+   * second definition of it — free to disagree with the one the runtime binds
+   * its handlers against. Sending the path instead is what the host already
+   * does for entry: it read the manifest, so the runtime does not have to.
+   * </pre>
+   *
+   * <code>string command_tree = 5 [json_name = "commandTree"];</code>
+   * @return The commandTree.
+   */
+  @java.lang.Override
+  public java.lang.String getCommandTree() {
+    return commandTree_;
+  }
+  /**
+   * <pre>
+   * Where the command tree sits inside the bundle, from the manifest's
+   * [commands] tree. Empty when the plugin declares no commands.
+   *
+   * The path, not the tree. The runtime opens this bundle anyway, and the tree
+   * is what its executor ids are numbered by, so sending a copy would be a
+   * second definition of it — free to disagree with the one the runtime binds
+   * its handlers against. Sending the path instead is what the host already
+   * does for entry: it read the manifest, so the runtime does not have to.
+   * </pre>
+   *
+   * <code>string command_tree = 5 [json_name = "commandTree"];</code>
+   * @return The bytes for commandTree.
+   */
+  @java.lang.Override
+  public com.google.protobuf.ByteString
+      getCommandTreeBytes() {
+    return com.google.protobuf.ByteString.copyFromUtf8(commandTree_);
+  }
+  /**
+   * <pre>
+   * Where the command tree sits inside the bundle, from the manifest's
+   * [commands] tree. Empty when the plugin declares no commands.
+   *
+   * The path, not the tree. The runtime opens this bundle anyway, and the tree
+   * is what its executor ids are numbered by, so sending a copy would be a
+   * second definition of it — free to disagree with the one the runtime binds
+   * its handlers against. Sending the path instead is what the host already
+   * does for entry: it read the manifest, so the runtime does not have to.
+   * </pre>
+   *
+   * <code>string command_tree = 5 [json_name = "commandTree"];</code>
+   * @param value The commandTree to set.
+   */
+  private void setCommandTree(
+      java.lang.String value) {
+    java.util.Objects.requireNonNull(value);
+
+    commandTree_ = value;
+  }
+  /**
+   * <pre>
+   * Where the command tree sits inside the bundle, from the manifest's
+   * [commands] tree. Empty when the plugin declares no commands.
+   *
+   * The path, not the tree. The runtime opens this bundle anyway, and the tree
+   * is what its executor ids are numbered by, so sending a copy would be a
+   * second definition of it — free to disagree with the one the runtime binds
+   * its handlers against. Sending the path instead is what the host already
+   * does for entry: it read the manifest, so the runtime does not have to.
+   * </pre>
+   *
+   * <code>string command_tree = 5 [json_name = "commandTree"];</code>
+   */
+  private void clearCommandTree() {
+
+    commandTree_ = getDefaultInstance().getCommandTree();
+  }
+  /**
+   * <pre>
+   * Where the command tree sits inside the bundle, from the manifest's
+   * [commands] tree. Empty when the plugin declares no commands.
+   *
+   * The path, not the tree. The runtime opens this bundle anyway, and the tree
+   * is what its executor ids are numbered by, so sending a copy would be a
+   * second definition of it — free to disagree with the one the runtime binds
+   * its handlers against. Sending the path instead is what the host already
+   * does for entry: it read the manifest, so the runtime does not have to.
+   * </pre>
+   *
+   * <code>string command_tree = 5 [json_name = "commandTree"];</code>
+   * @param value The bytes for commandTree to set.
+   */
+  private void setCommandTreeBytes(
+      com.google.protobuf.ByteString value) {
+    checkByteStringIsUtf8(value);
+    commandTree_ = value.toStringUtf8();
 
   }
 
@@ -643,6 +746,110 @@ public  final class Load extends
       return this;
     }
 
+    /**
+     * <pre>
+     * Where the command tree sits inside the bundle, from the manifest's
+     * [commands] tree. Empty when the plugin declares no commands.
+     *
+     * The path, not the tree. The runtime opens this bundle anyway, and the tree
+     * is what its executor ids are numbered by, so sending a copy would be a
+     * second definition of it — free to disagree with the one the runtime binds
+     * its handlers against. Sending the path instead is what the host already
+     * does for entry: it read the manifest, so the runtime does not have to.
+     * </pre>
+     *
+     * <code>string command_tree = 5 [json_name = "commandTree"];</code>
+     * @return The commandTree.
+     */
+    @java.lang.Override
+    public java.lang.String getCommandTree() {
+      return instance.getCommandTree();
+    }
+    /**
+     * <pre>
+     * Where the command tree sits inside the bundle, from the manifest's
+     * [commands] tree. Empty when the plugin declares no commands.
+     *
+     * The path, not the tree. The runtime opens this bundle anyway, and the tree
+     * is what its executor ids are numbered by, so sending a copy would be a
+     * second definition of it — free to disagree with the one the runtime binds
+     * its handlers against. Sending the path instead is what the host already
+     * does for entry: it read the manifest, so the runtime does not have to.
+     * </pre>
+     *
+     * <code>string command_tree = 5 [json_name = "commandTree"];</code>
+     * @return The bytes for commandTree.
+     */
+    @java.lang.Override
+    public com.google.protobuf.ByteString
+        getCommandTreeBytes() {
+      return instance.getCommandTreeBytes();
+    }
+    /**
+     * <pre>
+     * Where the command tree sits inside the bundle, from the manifest's
+     * [commands] tree. Empty when the plugin declares no commands.
+     *
+     * The path, not the tree. The runtime opens this bundle anyway, and the tree
+     * is what its executor ids are numbered by, so sending a copy would be a
+     * second definition of it — free to disagree with the one the runtime binds
+     * its handlers against. Sending the path instead is what the host already
+     * does for entry: it read the manifest, so the runtime does not have to.
+     * </pre>
+     *
+     * <code>string command_tree = 5 [json_name = "commandTree"];</code>
+     * @param value The commandTree to set.
+     * @return This builder for chaining.
+     */
+    public Builder setCommandTree(
+        java.lang.String value) {
+      copyOnWrite();
+      instance.setCommandTree(value);
+      return this;
+    }
+    /**
+     * <pre>
+     * Where the command tree sits inside the bundle, from the manifest's
+     * [commands] tree. Empty when the plugin declares no commands.
+     *
+     * The path, not the tree. The runtime opens this bundle anyway, and the tree
+     * is what its executor ids are numbered by, so sending a copy would be a
+     * second definition of it — free to disagree with the one the runtime binds
+     * its handlers against. Sending the path instead is what the host already
+     * does for entry: it read the manifest, so the runtime does not have to.
+     * </pre>
+     *
+     * <code>string command_tree = 5 [json_name = "commandTree"];</code>
+     * @return This builder for chaining.
+     */
+    public Builder clearCommandTree() {
+      copyOnWrite();
+      instance.clearCommandTree();
+      return this;
+    }
+    /**
+     * <pre>
+     * Where the command tree sits inside the bundle, from the manifest's
+     * [commands] tree. Empty when the plugin declares no commands.
+     *
+     * The path, not the tree. The runtime opens this bundle anyway, and the tree
+     * is what its executor ids are numbered by, so sending a copy would be a
+     * second definition of it — free to disagree with the one the runtime binds
+     * its handlers against. Sending the path instead is what the host already
+     * does for entry: it read the manifest, so the runtime does not have to.
+     * </pre>
+     *
+     * <code>string command_tree = 5 [json_name = "commandTree"];</code>
+     * @param value The bytes for commandTree to set.
+     * @return This builder for chaining.
+     */
+    public Builder setCommandTreeBytes(
+        com.google.protobuf.ByteString value) {
+      copyOnWrite();
+      instance.setCommandTreeBytes(value);
+      return this;
+    }
+
     // @@protoc_insertion_point(builder_scope:gocraft.abi.v1.Load)
   }
   @java.lang.Override
@@ -663,10 +870,11 @@ public  final class Load extends
             "bundlePath_",
             "entry_",
             "dataDirectory_",
+            "commandTree_",
           };
           java.lang.String info =
-              "\u0000\u0004\u0000\u0000\u0001\u0004\u0004\u0000\u0000\u0000\u0001\u0208\u0002\u0208" +
-              "\u0003\u0208\u0004\u0208";
+              "\u0000\u0005\u0000\u0000\u0001\u0005\u0005\u0000\u0000\u0000\u0001\u0208\u0002\u0208" +
+              "\u0003\u0208\u0004\u0208\u0005\u0208";
           return newMessageInfo(DEFAULT_INSTANCE, info, objects);
       }
       case GET_DEFAULT_INSTANCE: {

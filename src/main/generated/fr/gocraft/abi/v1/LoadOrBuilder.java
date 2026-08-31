@@ -83,4 +83,38 @@ public interface LoadOrBuilder extends
    */
   com.google.protobuf.ByteString
       getDataDirectoryBytes();
+
+  /**
+   * <pre>
+   * Where the command tree sits inside the bundle, from the manifest's
+   * [commands] tree. Empty when the plugin declares no commands.
+   *
+   * The path, not the tree. The runtime opens this bundle anyway, and the tree
+   * is what its executor ids are numbered by, so sending a copy would be a
+   * second definition of it — free to disagree with the one the runtime binds
+   * its handlers against. Sending the path instead is what the host already
+   * does for entry: it read the manifest, so the runtime does not have to.
+   * </pre>
+   *
+   * <code>string command_tree = 5 [json_name = "commandTree"];</code>
+   * @return The commandTree.
+   */
+  java.lang.String getCommandTree();
+  /**
+   * <pre>
+   * Where the command tree sits inside the bundle, from the manifest's
+   * [commands] tree. Empty when the plugin declares no commands.
+   *
+   * The path, not the tree. The runtime opens this bundle anyway, and the tree
+   * is what its executor ids are numbered by, so sending a copy would be a
+   * second definition of it — free to disagree with the one the runtime binds
+   * its handlers against. Sending the path instead is what the host already
+   * does for entry: it read the manifest, so the runtime does not have to.
+   * </pre>
+   *
+   * <code>string command_tree = 5 [json_name = "commandTree"];</code>
+   * @return The bytes for commandTree.
+   */
+  com.google.protobuf.ByteString
+      getCommandTreeBytes();
 }
