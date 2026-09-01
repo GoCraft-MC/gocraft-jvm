@@ -13,6 +13,7 @@ import java.util.zip.ZipFile;
 import org.gradle.testkit.runner.BuildResult;
 import org.gradle.testkit.runner.GradleRunner;
 import org.gradle.testkit.runner.TaskOutcome;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -28,6 +29,13 @@ import org.junit.jupiter.api.io.TempDir;
 /// It reaches the network on purpose. Everything it exercises is a promise made
 /// to someone else's machine, and a test that stubbed the network would only
 /// assert that this code agrees with itself.
+///
+/// Which is also why it does not run from `build`: it resolves the API at the
+/// version this tree declares, and that version exists only once the tag is
+/// pushed and JitPack has built it. `./gradlew verifyRelease` is the check on a
+/// release; `build` is the check on a commit, and the two cannot be the same
+/// task without one of them lying.
+@Tag("release")
 class BundleFunctionalTest {
 
     @TempDir

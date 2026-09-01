@@ -79,11 +79,19 @@ public abstract class ResolveToolTask extends DefaultTask {
 
     /// The naming is a contract with the release workflow, constructed here and
     /// therefore not free to change there.
-    private static String assetName(String version) {
-        return "gocraft-cli_" + version + "_" + operatingSystem() + "_" + architecture() + extension();
+    ///
+    /// Package-private and taking what it needs rather than reading the world,
+    /// so a test can assert the contract for every platform the workflow builds
+    /// instead of only the one it happens to run on.
+    static String assetName(String version, String os, String arch) {
+        return "gocraft-cli_" + version + "_" + os + "_" + arch + (os.equals("windows") ? ".exe" : "");
     }
 
-    private static String operatingSystem() {
+    private static String assetName(String version) {
+        return assetName(version, operatingSystem(), architecture());
+    }
+
+    static String operatingSystem() {
         String name = System.getProperty("os.name", "").toLowerCase(Locale.ROOT);
         if (name.contains("mac") || name.contains("darwin")) {
             return "darwin";
@@ -98,7 +106,7 @@ public abstract class ResolveToolTask extends DefaultTask {
                 + "; set gocraft.toolRepository at a mirror that has one");
     }
 
-    private static String architecture() {
+    static String architecture() {
         String arch = System.getProperty("os.arch", "").toLowerCase(Locale.ROOT);
         if (arch.equals("aarch64") || arch.equals("arm64")) {
             return "arm64";
@@ -107,10 +115,6 @@ public abstract class ResolveToolTask extends DefaultTask {
             return "amd64";
         }
         throw new GradleException("no gocraft-cli build for " + System.getProperty("os.arch"));
-    }
-
-    private static String extension() {
-        return operatingSystem().equals("windows") ? ".exe" : "";
     }
 
     private String url(String version, String asset) {

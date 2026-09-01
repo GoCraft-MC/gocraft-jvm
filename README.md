@@ -84,7 +84,7 @@ pluginManagement {
 ```kotlin
 // build.gradle.kts
 plugins {
-    id("fr.gocraft.plugin") version "v0.1.0"
+    id("fr.gocraft.plugin") version "v0.2.1"
 }
 ```
 

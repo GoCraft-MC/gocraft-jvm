@@ -62,3 +62,22 @@ val versionResource by tasks.registering {
 sourceSets.main {
     resources.srcDir(versionResource.map { it.outputs.files.singleFile.parentFile })
 }
+
+// The end-to-end test resolves the API at the version this tree declares, which
+// exists only once the tag is pushed. It is therefore a check on a release
+// rather than on a commit, and running it from `build` would make every build
+// between two releases fail for a reason nobody can act on.
+//
+//   ./gradlew verifyRelease     after tagging and letting JitPack build
+tasks.test {
+    useJUnitPlatform { excludeTags("release") }
+}
+
+tasks.register<Test>("verifyRelease") {
+    group = "verification"
+    description = "Builds a real plugin project against the published artefacts."
+    testClassesDirs = sourceSets.test.get().output.classesDirs
+    classpath = sourceSets.test.get().runtimeClasspath
+    useJUnitPlatform { includeTags("release") }
+    outputs.upToDateWhen { false }
+}
