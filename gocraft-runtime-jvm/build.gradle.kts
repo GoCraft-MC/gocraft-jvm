@@ -46,19 +46,18 @@ sourceSets {
 }
 
 // abiSchema points at the directory holding abi/v1/*.proto. It defaults to the
-// sibling GoCraft checkout because there is no shared schema repository yet;
-// deliverable 01 gives the ABI its own, and this becomes a real dependency.
+// sibling gocraft-abi checkout, which is where deliverable 01 put the schema.
 val abiSchema: String by project
 
 tasks.register<Exec>("generateProto") {
-    description = "Regenerates the ABI sources from the GoCraft schema. Needs buf."
+    description = "Regenerates the ABI sources from the gocraft-abi schema. Needs buf."
     group = "build"
     val schema = file(abiSchema)
     doFirst {
         if (!schema.resolve("abi/v1/envelope.proto").exists()) {
             throw GradleException(
                 "no ABI schema at ${schema.absolutePath}. Point abiSchema in " +
-                    "gradle.properties at a GoCraft checkout, or pass " +
+                    "gradle.properties at a gocraft-abi checkout, or pass " +
                     "-PabiSchema=<path>."
             )
         }
