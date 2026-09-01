@@ -13,9 +13,11 @@ val repositoryUrl = "https://github.com/GoCraft-MC/gocraft-jvm"
 // backed by gocraft.fr; publishing there needs the domain proven, and until it
 // is, JitPack serves the same builds under com.github.GoCraft-MC. Declaring
 // com.github.* here instead would bake the interim host into the artefact.
+val declaredVersion: String by project
+
 allprojects {
     group = "fr.gocraft"
-    version = "0.1.0"
+    version = declaredVersion
 
     repositories {
         mavenCentral()

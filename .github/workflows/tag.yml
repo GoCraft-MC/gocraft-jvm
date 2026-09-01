@@ -1,0 +1,33 @@
+# The check that would have caught a release pairing itself with the wrong API.
+#
+# These artefacts publish under the tag, but the Gradle plugin reads the version
+# baked into its own jar to name the API and processor a plugin author compiles
+# against. A tag ahead of gradle.properties therefore ships a plugin that tells
+# everyone to use an API from an earlier release — silently, because both
+# versions exist and both resolve.
+#
+# It happened once. This is why it cannot happen twice.
+name: tag
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  version:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: The tag and the declared version must agree
+        run: |
+          declared=$(sed -n 's/^declaredVersion=//p' gradle.properties)
+          expected="v${declared}"
+          if [ "$expected" != "${GITHUB_REF_NAME}" ]; then
+            echo "tag ${GITHUB_REF_NAME} but gradle.properties declares ${declared}," \
+                 "which would publish as ${expected}." >&2
+            echo "Bump declaredVersion and re-tag; this release would pair the build" \
+                 "plugin with an API from another one." >&2
+            exit 1
+          fi
+          echo "${GITHUB_REF_NAME} matches declaredVersion=${declared}"
