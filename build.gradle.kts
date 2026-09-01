@@ -47,6 +47,12 @@ allprojects {
                 from(components["java"])
                 pom {
                     url = repositoryUrl
+                    licenses {
+                        license {
+                            name = "The Apache License, Version 2.0"
+                            url = "https://www.apache.org/licenses/LICENSE-2.0.txt"
+                        }
+                    }
                     developers {
                         developer {
                             id = "Traqueur"
