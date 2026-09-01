@@ -25,7 +25,7 @@ import javax.tools.ToolProvider;
 /// it. A bad emitter fails here rather than in whichever plugin hits it first.
 final class Javac {
 
-    record Result(List<String> errors, List<Generated> generated) {
+    record Result(List<String> errors, List<Generated> generated, String intermediate) {
 
         String source(String name) {
             for (Generated file : generated) {
@@ -112,7 +112,9 @@ final class Javac {
                     generated.add(new Generated(name, Files.readString(produced)));
                 }
             }
-            return new Result(errors, generated);
+            Path json = classes.resolve("gocraft/commands.json");
+            String intermediate = Files.exists(json) ? Files.readString(json) : "";
+            return new Result(errors, generated, intermediate);
         }
     }
 

@@ -21,7 +21,9 @@ import javax.lang.model.element.ExecutableElement;
 import javax.lang.model.element.Modifier;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.element.VariableElement;
+import javax.tools.FileObject;
 import javax.tools.JavaFileObject;
+import javax.tools.StandardLocation;
 
 /// Turns an annotated class into the command tree it describes.
 ///
@@ -36,6 +38,11 @@ import javax.tools.JavaFileObject;
 /// sees them underlined, not in a server log.
 @SupportedAnnotationTypes("fr.gocraft.api.command.Cmd")
 public final class CommandProcessor extends AbstractProcessor {
+
+    /// Every command seen so far. A processor runs in rounds — generated code
+    /// can itself be annotated — so the intermediate is written once, at the
+    /// end, rather than overwritten by whichever round happened to be last.
+    private final List<Tree> declared = new ArrayList<>();
 
     @Override
     public SourceVersion getSupportedSourceVersion() {
@@ -53,7 +60,29 @@ public final class CommandProcessor extends AbstractProcessor {
             }
             declare((TypeElement) element, slots, diagnostics);
         }
+        if (round.processingOver() && !declared.isEmpty() && !diagnostics.failed()) {
+            writeIntermediate(diagnostics);
+        }
         return true;
+    }
+
+    /// Hands the trees to whoever builds the bundle.
+    ///
+    /// Beside the class files rather than beside the sources, because it is a
+    /// build output and not something anyone edits. `gocraft build` reads it,
+    /// mints the executor ids once, and writes commands.pb — which is why no id
+    /// appears in this file.
+    private void writeIntermediate(Diagnostics diagnostics) {
+        try {
+            FileObject file = processingEnv.getFiler()
+                    .createResource(StandardLocation.CLASS_OUTPUT, "", Intermediate.PATH);
+            try (Writer writer = file.openWriter()) {
+                writer.write(new Intermediate().render(declared));
+            }
+        } catch (IOException failure) {
+            processingEnv.getMessager().printMessage(javax.tools.Diagnostic.Kind.ERROR,
+                    "could not write " + Intermediate.PATH + ": " + failure.getMessage());
+        }
     }
 
     private void declare(TypeElement type, Slots slots, Diagnostics diagnostics) {
@@ -81,6 +110,7 @@ public final class CommandProcessor extends AbstractProcessor {
         if (diagnostics.failed()) {
             return;
         }
+        declared.add(root);
         write(type, root, diagnostics);
     }
 
@@ -163,11 +193,11 @@ public final class CommandProcessor extends AbstractProcessor {
                 }
                 if (segment instanceof CommandPath.Slot slot) {
                     Slot argument = declared.get(slot.name());
-                    node = node.child(slot.name(), true, argument.type());
+                    node = node.child(slot.name(), true, argument.type(), argument.json());
                     node.greedy = argument.greedy();
                     continue;
                 }
-                node = node.child(segment.name(), false, null);
+                node = node.child(segment.name(), false, null, null);
             }
             Permission guard = method.getAnnotation(Permission.class);
             if (guard != null) {

@@ -17,6 +17,9 @@ final class Tree {
     /// The ArgType expression, for an argument. Null for a literal.
     final String type;
 
+    /// The same type described without Java, for the bundle build.
+    final String json;
+
     String permission = "";
 
     /// The call the invoker makes. Null when nothing runs here.
@@ -28,14 +31,15 @@ final class Tree {
     /// their methods rather than in whatever order a hash produced.
     final Map<String, Tree> children = new LinkedHashMap<>();
 
-    Tree(String name, boolean argument, String type) {
+    Tree(String name, boolean argument, String type, String json) {
         this.name = name;
         this.argument = argument;
         this.type = type;
+        this.json = json;
     }
 
     static Tree literal(String name) {
-        return new Tree(name, false, null);
+        return new Tree(name, false, null, null);
     }
 
     /// child finds or creates one step, and reports a step two methods spelled
@@ -44,11 +48,11 @@ final class Tree {
     /// Keyed by kind and name together, because a literal and an argument may
     /// share a level — /warp home and /warp <target> — and only a repeat within
     /// one kind is a conflict.
-    Tree child(String name, boolean argument, String type) {
+    Tree child(String name, boolean argument, String type, String json) {
         String key = (argument ? "<" : "") + name;
         Tree existing = children.get(key);
         if (existing == null) {
-            Tree created = new Tree(name, argument, type);
+            Tree created = new Tree(name, argument, type, json);
             children.put(key, created);
             return created;
         }

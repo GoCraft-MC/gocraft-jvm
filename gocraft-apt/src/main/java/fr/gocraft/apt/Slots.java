@@ -45,18 +45,27 @@ final class Slots {
         }
 
         return switch (declared) {
-            case "int", "java.lang.Integer" -> new Slot(name, integerType(range), "(int) context.number(\"" + name + "\")", false);
-            case "long", "java.lang.Long" -> new Slot(name, integerType(range), "context.number(\"" + name + "\")", false);
-            case "double", "java.lang.Double" -> new Slot(name, decimalType(range), "context.decimal(\"" + name + "\")", false);
-            case "float", "java.lang.Float" -> new Slot(name, decimalType(range), "(float) context.decimal(\"" + name + "\")", false);
+            case "int", "java.lang.Integer" -> new Slot(name, integerType(range),
+                    "(int) context.number(\"" + name + "\")", false, bounded("integer", range));
+            case "long", "java.lang.Long" -> new Slot(name, integerType(range),
+                    "context.number(\"" + name + "\")", false, bounded("integer", range));
+            case "double", "java.lang.Double" -> new Slot(name, decimalType(range),
+                    "context.decimal(\"" + name + "\")", false, bounded("decimal", range));
+            case "float", "java.lang.Float" -> new Slot(name, decimalType(range),
+                    "(float) context.decimal(\"" + name + "\")", false, bounded("decimal", range));
             case "java.lang.String" -> new Slot(name,
                     greedy ? "ArgType.greedy()" : "ArgType.string()",
-                    "context.text(\"" + name + "\")", greedy);
-            case "fr.gocraft.api.PlayerRef" -> new Slot(name, "ArgType.player()", "context.player(\"" + name + "\")", false);
-            case "fr.gocraft.api.BlockPos" -> new Slot(name, "ArgType.blockPos()", "context.position(\"" + name + "\")", false);
-            case "fr.gocraft.api.Block" -> new Slot(name, "ArgType.blockState()", "context.block(\"" + name + "\")", false);
-            case "fr.gocraft.api.ItemRef" -> new Slot(name, "ArgType.item()", "context.item(\"" + name + "\")", false);
-            case "java.time.Duration" -> new Slot(name, "ArgType.duration()", "context.duration(\"" + name + "\")", false);
+                    "context.text(\"" + name + "\")", greedy, kind(greedy ? "greedy" : "string"));
+            case "fr.gocraft.api.PlayerRef" -> new Slot(name, "ArgType.player()",
+                    "context.player(\"" + name + "\")", false, kind("player"));
+            case "fr.gocraft.api.BlockPos" -> new Slot(name, "ArgType.blockPos()",
+                    "context.position(\"" + name + "\")", false, kind("block_pos"));
+            case "fr.gocraft.api.Block" -> new Slot(name, "ArgType.blockState()",
+                    "context.block(\"" + name + "\")", false, kind("block_state"));
+            case "fr.gocraft.api.ItemRef" -> new Slot(name, "ArgType.item()",
+                    "context.item(\"" + name + "\")", false, kind("item"));
+            case "java.time.Duration" -> new Slot(name, "ArgType.duration()",
+                    "context.duration(\"" + name + "\")", false, kind("duration"));
             default -> enumeration(parameter, name, declared, mirror, diagnostics);
         };
     }
@@ -93,7 +102,38 @@ final class Slots {
         options.append(')');
         String read = declared + ".valueOf(context.text(\"" + name
                 + "\").toUpperCase(java.util.Locale.ROOT))";
-        return new Slot(name, options.toString(), read, false);
+        StringBuilder json = new StringBuilder("\"kind\": \"enum\", \"options\": [");
+        for (int index = 0; index < constants.size(); index++) {
+            if (index > 0) {
+                json.append(", ");
+            }
+            json.append('"').append(constants.get(index).toLowerCase(java.util.Locale.ROOT)).append('"');
+        }
+        json.append(']');
+        return new Slot(name, options.toString(), read, false, json.toString());
+    }
+
+    /// kind is the neutral description of a type that carries no constraint.
+    private static String kind(String name) {
+        return "\"kind\": \"" + name + "\"";
+    }
+
+    /// bounded is the same, with whichever bounds were declared. A bound left
+    /// out is absent rather than saturated: "open above" and "at most the
+    /// largest long" are not the same statement.
+    private static String bounded(String name, Range range) {
+        StringBuilder json = new StringBuilder(kind(name));
+        if (range != null && !Double.isInfinite(range.min())) {
+            json.append(", \"min\": ").append(number(name, range.min()));
+        }
+        if (range != null && !Double.isInfinite(range.max())) {
+            json.append(", \"max\": ").append(number(name, range.max()));
+        }
+        return json.toString();
+    }
+
+    private static String number(String kind, double value) {
+        return kind.equals("integer") ? String.valueOf((long) value) : String.valueOf(value);
     }
 
     /// Bounds are emitted as the record rather than the factory, because only

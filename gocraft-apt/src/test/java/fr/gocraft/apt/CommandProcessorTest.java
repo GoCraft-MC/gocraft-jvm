@@ -263,6 +263,80 @@ class CommandProcessorTest {
         assertTrue(result.firstError().contains("runs nothing"), result.firstError());
     }
 
+
+    /// The second half of §15's job: what only javac can see, handed to the one
+    /// program that writes bundles.
+    ///
+    /// No executor ids in it. They are minted by whoever writes the wire tree,
+    /// and the generated builder mints its own at runtime; a third set here
+    /// would be a third thing to keep in step.
+    @Test
+    void writesTheTreeForTheBundleBuild() throws IOException {
+        Javac.Result result = Javac.compile("ShopCommands", SHOP);
+        assertEquals("", result.firstError());
+
+        String json = result.intermediate();
+        assertTrue(json.contains("\"version\": 1"), json);
+        assertTrue(json.contains("\"name\": \"shop\""), json);
+        assertTrue(json.contains("\"permission\": \"shop.use\""), json);
+        assertTrue(json.contains("\"permission\": \"shop.admin\""), json);
+        assertTrue(json.contains("\"argument\": true"), json);
+        // The type is described, not spelled as Java: the program that reads
+        // this has no opinion about ArgType expressions.
+        assertTrue(json.contains("\"kind\": \"decimal\", \"min\": 0.01, \"max\": 1000.0"), json);
+        assertTrue(json.contains("\"runs\": true"), json);
+        assertTrue(!json.contains("executor"), "the intermediate names an executor id");
+        assertTrue(!json.contains("ArgType"), "the intermediate leaked Java");
+    }
+
+    @Test
+    void describesEveryArgumentKindNeutrally() throws IOException {
+        Javac.Result result = Javac.compile("Every", """
+                import fr.gocraft.api.BlockPos;
+                import fr.gocraft.api.command.Cmd;
+                import fr.gocraft.api.command.Greedy;
+                import fr.gocraft.api.command.Range;
+                import fr.gocraft.api.command.Sub;
+                import java.time.Duration;
+
+                @Cmd("every")
+                public final class Every {
+                    enum Mode { SURVIVAL, CREATIVE }
+
+                    @Sub("count <amount>") void count(@Range(min = 1) int amount) {}
+                    @Sub("at <where>")     void at(BlockPos where) {}
+                    @Sub("wait <how>")     void wait(Duration how) {}
+                    @Sub("mode <mode>")    void mode(Mode mode) {}
+                    @Sub("say <message>")  void say(@Greedy String message) {}
+                }
+                """);
+        assertEquals("", result.firstError());
+        String json = result.intermediate();
+        // A bound left out is absent, not saturated: "open above" and "at most
+        // the largest long" are different statements.
+        assertTrue(json.contains("\"kind\": \"integer\", \"min\": 1"), json);
+        assertTrue(!json.contains("\"max\": 9223372036854775807"), json);
+        assertTrue(json.contains("\"kind\": \"block_pos\""), json);
+        assertTrue(json.contains("\"kind\": \"duration\""), json);
+        assertTrue(json.contains("\"kind\": \"greedy\""), json);
+        assertTrue(json.contains("\"kind\": \"enum\", \"options\": [\"survival\", \"creative\"]"), json);
+    }
+
+    /// A compilation that failed writes nothing. A bundle built from a tree
+    /// whose code did not compile would be a bundle promising commands that do
+    /// not exist.
+    @Test
+    void writesNothingWhenTheCommandIsMalformed() throws IOException {
+        assertEquals("", failing("""
+                @Cmd("shop")
+                public final class Broken {
+                    @Sub("sell <price>")
+                    void sell() {
+                    }
+                }
+                """).intermediate());
+    }
+
     private static Javac.Result failing(String body) throws IOException {
         Javac.Result result = Javac.compile("Broken", """
                 import fr.gocraft.api.command.Cmd;
