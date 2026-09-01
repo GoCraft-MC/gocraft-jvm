@@ -18,7 +18,6 @@ import org.gradle.api.file.RegularFileProperty;
 import org.gradle.api.tasks.InputFile;
 import org.gradle.api.tasks.InputFiles;
 import org.gradle.api.tasks.Internal;
-import org.gradle.api.tasks.Optional;
 import org.gradle.api.tasks.OutputFile;
 import org.gradle.api.tasks.PathSensitive;
 import org.gradle.api.tasks.PathSensitivity;
@@ -51,12 +50,17 @@ public abstract class BundleTask extends DefaultTask {
     @InputFiles
     public abstract ConfigurableFileCollection getPayload();
 
-    /// What gocraft-apt wrote while javac compiled. Absent for a plugin that
-    /// declares no commands, which is most of them.
-    @InputFile
-    @Optional
+    /// What gocraft-apt wrote while javac compiled.
+    ///
+    /// A collection rather than a file, because most plugins declare no
+    /// commands and there is then nothing at that path. An @Optional
+    /// RegularFileProperty does not cover it: optional means the property may
+    /// be unset, and this one is set — to a file the processor had no reason to
+    /// write. A file collection is allowed to be empty, which is what "no
+    /// commands" actually is.
+    @InputFiles
     @PathSensitive(PathSensitivity.RELATIVE)
-    public abstract RegularFileProperty getCommands();
+    public abstract ConfigurableFileCollection getCommands();
 
     @OutputFile
     public abstract RegularFileProperty getBundle();
@@ -82,9 +86,12 @@ public abstract class BundleTask extends DefaultTask {
         arguments.add("build");
         arguments.add("-o");
         arguments.add(getBundle().get().getAsFile().getAbsolutePath());
-        if (getCommands().isPresent() && getCommands().get().getAsFile().isFile()) {
-            arguments.add("-commands");
-            arguments.add(getCommands().get().getAsFile().getAbsolutePath());
+        for (File declared : getCommands()) {
+            if (declared.isFile()) {
+                arguments.add("-commands");
+                arguments.add(declared.getAbsolutePath());
+                break;
+            }
         }
         arguments.add(staging.toAbsolutePath().toString());
 

@@ -96,9 +96,10 @@ public final class GoCraftPlugin implements Plugin<Project> {
                             .getByName(JavaPlugin.RUNTIME_CLASSPATH_CONFIGURATION_NAME)
                     : project.files()));
 
-            // Where gocraft-apt wrote while javac ran. Absent for a plugin that
-            // declares no commands, which the task tolerates.
-            task.getCommands().set(project.getLayout().getBuildDirectory()
+            // Where gocraft-apt wrote while javac ran. Nothing is there for a
+            // plugin that declares no commands, and a file collection is
+            // allowed to be empty where an input file would not be.
+            task.getCommands().from(project.getLayout().getBuildDirectory()
                     .file("classes/java/main/gocraft/commands.json"));
         });
     }

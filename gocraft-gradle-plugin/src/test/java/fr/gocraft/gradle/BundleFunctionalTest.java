@@ -130,6 +130,108 @@ class BundleFunctionalTest {
         assertEquals(TaskOutcome.UP_TO_DATE, again.task(":gocraftTool").getOutcome());
     }
 
+    /// Most plugins declare no commands, and for a while none of them could be
+    /// bundled: the task pointed at the file gocraft-apt writes and Gradle
+    /// refused to run with an input that is not there. Every test above happened
+    /// to declare commands, so nothing said so until one did not.
+    @Test
+    void bundlesAPluginThatDeclaresNoCommands() throws IOException {
+        write("settings.gradle.kts", "rootProject.name = \"quiet\"\n");
+        write("build.gradle.kts", """
+                plugins {
+                    id("fr.gocraft.plugin")
+                }
+                """);
+        write("plugin.toml", """
+                id      = "fr.oreo.quiet"
+                version = "1.0.0"
+                api     = 1
+                runtime = "jvm"
+                entry   = "fr.oreo.quiet.QuietPlugin"
+                """);
+        write("src/main/java/fr/oreo/quiet/QuietPlugin.java", """
+                package fr.oreo.quiet;
+
+                import fr.gocraft.api.Plugin;
+
+                public final class QuietPlugin implements Plugin {
+                }
+                """);
+
+        BuildResult result = GradleRunner.create()
+                .withProjectDir(project.toFile())
+                .withPluginClasspath()
+                .withArguments("gocraftBundle", "--stacktrace")
+                .build();
+
+        assertEquals(TaskOutcome.SUCCESS, result.task(":gocraftBundle").getOutcome());
+        List<String> entries = entriesOf(project.resolve("build/gocraft/quiet.gcpkg"));
+        assertTrue(entries.contains("plugin.toml"), entries.toString());
+        // And no tree, because there was nothing to put in one.
+        assertTrue(entries.stream().noneMatch(name -> name.endsWith(".pb")), entries.toString());
+    }
+
+    /// The settings block the README tells an author to paste.
+    ///
+    /// Everything above resolves the plugin through withPluginClasspath(),
+    /// which hands Gradle the classes directly and never touches a repository.
+    /// This is the only test that goes through the door a real author uses —
+    /// and the only one that can fail because the documentation is wrong.
+    @Test
+    void appliesByIdThroughJitpack() throws IOException {
+        String version = "v" + declaredVersion();
+        write("settings.gradle.kts", """
+                pluginManagement {
+                    repositories {
+                        maven { url = uri("https://jitpack.io") }
+                        gradlePluginPortal()
+                    }
+                    resolutionStrategy.eachPlugin {
+                        if (requested.id.id == "fr.gocraft.plugin") {
+                            useModule("com.github.GoCraft-MC.gocraft-jvm:gocraft-gradle-plugin:${requested.version}")
+                        }
+                    }
+                }
+                rootProject.name = "byid"
+                """);
+        write("build.gradle.kts", """
+                plugins {
+                    id("fr.gocraft.plugin") version "%s"
+                }
+                """.formatted(version));
+        write("plugin.toml", """
+                id      = "fr.oreo.byid"
+                version = "1.0.0"
+                api     = 1
+                runtime = "jvm"
+                entry   = "fr.oreo.byid.Nothing"
+                """);
+        write("src/main/java/fr/oreo/byid/Nothing.java", """
+                package fr.oreo.byid;
+
+                import fr.gocraft.api.Plugin;
+
+                public final class Nothing implements Plugin {
+                }
+                """);
+
+        BuildResult result = GradleRunner.create()
+                .withProjectDir(project.toFile())
+                .withArguments("gocraftBundle", "--stacktrace")
+                .build();
+
+        assertEquals(TaskOutcome.SUCCESS, result.task(":gocraftBundle").getOutcome());
+        assertTrue(Files.isRegularFile(project.resolve("build/gocraft/byid.gcpkg")));
+    }
+
+    private static String declaredVersion() throws IOException {
+        java.util.Properties properties = new java.util.Properties();
+        try (var source = GoCraftPlugin.class.getResourceAsStream("/gocraft-plugin.properties")) {
+            properties.load(source);
+        }
+        return properties.getProperty("version");
+    }
+
     private void write(String path, String content) throws IOException {
         Path target = project.resolve(path);
         Files.createDirectories(target.getParent());
