@@ -32,3 +32,8 @@ rootProject.name = "gocraft-jvm"
 include("gocraft-api-jvm")
 include("gocraft-runtime-jvm")
 include("gocraft-apt")
+
+// The build plugin. It runs on a plugin author's machine, in their build, which
+// is a fourth place with its own lifetime — and the only artefact here that
+// names the other three.
+include("gocraft-gradle-plugin")

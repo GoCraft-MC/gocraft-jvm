@@ -8,6 +8,7 @@ system. It produces three artefacts, because three different machines run them:
 | `gocraft-api-jvm` | the plugin. The only one an author names, and it has no dependencies at all |
 | `gocraft-runtime-jvm` | the server, which extracts and spawns `gocraft-runtime.jar` |
 | `gocraft-apt` | javac, while a plugin is compiled, and never again |
+| `gocraft-gradle-plugin` | a plugin author's build, on their machine |
 
 Keeping them apart is what keeps a plugin's classpath free of protobuf, of the
 loader, and of a code generator.
@@ -66,35 +67,58 @@ state is a cache, never a record.
 ### Your build
 
 ```kotlin
-repositories {
-    mavenCentral()
-    maven { url = uri("https://jitpack.io") }
-}
-
-dependencies {
-    compileOnly("com.github.GoCraft-MC.gocraft-jvm:gocraft-api-jvm:v0.1.0")
-    annotationProcessor("com.github.GoCraft-MC.gocraft-jvm:gocraft-apt:v0.1.0")
-    // Served by JitPack until Maven Central; see below for why.
+// settings.gradle.kts
+pluginManagement {
+    repositories {
+        maven { url = uri("https://jitpack.io") }
+        gradlePluginPortal()
+    }
+    resolutionStrategy.eachPlugin {
+        if (requested.id.id == "fr.gocraft.plugin") {
+            useModule("com.github.GoCraft-MC.gocraft-jvm:gocraft-gradle-plugin:${requested.version}")
+        }
+    }
 }
 ```
 
-`compileOnly` is right and not a shortcut: the runtime already carries the API,
-and a plugin shipping its own copy would load classes the host does not
-recognise as its own. `annotationProcessor` is only needed if you use the
-annotations.
+```kotlin
+// build.gradle.kts
+plugins {
+    id("fr.gocraft.plugin") version "v0.1.0"
+}
+```
 
-Then:
+That is the whole build file. The plugin declares the API as `compileOnly` and
+the processor as `annotationProcessor` at versions matching its own, sets the
+Java 25 toolchain the runtime needs, and adds two tasks:
 
 ```sh
-./gradlew build
-go run github.com/GoCraft-MC/gocraft-cli@latest \
-    build -commands build/classes/java/main/gocraft/commands.json \
-    -o shop.gcpkg .
+./gradlew gocraftBundle    # -> build/gocraft/<project>.gcpkg
 ```
 
-`gocraft-apt` wrote that JSON while javac compiled you. `gocraft-cli` turns it
-into the `commands.pb` in the bundle — the same program, reading the same kind
-of file, as for a Go plugin.
+It compiles you, stages the layout the runtime extracts — `plugin.toml` at the
+root, jars under `payload/` — downloads `gocraft-cli` for your machine, checks
+it against the release's published `checksums.txt` **before running it**, and
+hands it the file `gocraft-apt` wrote while javac was compiling you.
+
+Nothing in that list is something you should have to write, and two of them are
+things you would get subtly wrong: the coordinates have to agree with each
+other, and a build that runs an unverified binary it just pulled off the network
+is a supply chain with a hole in it.
+
+If you would rather not: the coordinates are
+`com.github.GoCraft-MC.gocraft-jvm:gocraft-api-jvm:<tag>` and `…:gocraft-apt:<tag>`
+from `https://jitpack.io`, and `gocraft-cli build -commands
+build/classes/java/main/gocraft/commands.json -o my-plugin.gcpkg <staged dir>`
+does the rest. You then own keeping those versions in step.
+
+```kotlin
+gocraft {
+    bundleName = "shop"          // defaults to the project name
+    includeDependencies = true   // your jars go under payload/ too
+    toolPath = "/usr/local/bin/gocraft-cli"   // offline: use this one, unverified
+}
+```
 
 ### Declaring commands
 
