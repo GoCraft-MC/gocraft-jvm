@@ -1,6 +1,8 @@
 package fr.gocraft.apt;
 
 import java.io.IOException;
+import java.net.URL;
+import java.net.URLClassLoader;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -49,6 +51,36 @@ final class Javac {
     static Result compile(String className, String source) throws IOException {
         Path root = Files.createTempDirectory("apt");
         try {
+            return run(root, className, source);
+        } finally {
+            delete(root);
+        }
+    }
+
+    /// compileAndLoad keeps the class files, so a test can call what the
+    /// processor generated rather than only read it.
+    ///
+    /// The loader delegates to the parent for fr.gocraft.api, so a CommandSet
+    /// it hands back is the same class the test holds — which is the only way
+    /// the three facades can be compared to each other at all.
+    record Loaded(Result result, URLClassLoader loader, Path root) implements AutoCloseable {
+        @Override
+        public void close() throws IOException {
+            loader.close();
+            delete(root);
+        }
+    }
+
+    static Loaded compileAndLoad(String className, String source) throws IOException {
+        Path root = Files.createTempDirectory("apt");
+        Result result = run(root, className, source);
+        URLClassLoader loader = new URLClassLoader(
+                new URL[] {root.resolve("out").toUri().toURL()}, Javac.class.getClassLoader());
+        return new Loaded(result, loader, root);
+    }
+
+    private static Result run(Path root, String className, String source) throws IOException {
+        {
             Path sources = Files.createDirectories(root.resolve("src"));
             Path classes = Files.createDirectories(root.resolve("out"));
             Path emitted = Files.createDirectories(root.resolve("gen"));
@@ -81,8 +113,6 @@ final class Javac {
                 }
             }
             return new Result(errors, generated);
-        } finally {
-            delete(root);
         }
     }
 
