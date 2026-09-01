@@ -62,10 +62,3 @@ val versionResource by tasks.registering {
 sourceSets.main {
     resources.srcDir(versionResource.map { it.outputs.files.singleFile.parentFile })
 }
-
-// The functional test packs a real bundle, which needs a real packer. Until
-// gocraft-cli publishes a release the test uses one built locally, handed over
-// the same way an author on a machine with no network would hand one over.
-tasks.test {
-    systemProperty("gocraft.test.tool", providers.gradleProperty("gocraftCli").getOrElse(""))
-}

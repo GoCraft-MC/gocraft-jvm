@@ -38,7 +38,7 @@ public final class GoCraftPlugin implements Plugin<Project> {
     /// the release this plugin was built and tested against — moved
     /// deliberately when a new one is worth having.
     private static final String TOOL_REPOSITORY = "https://github.com/GoCraft-MC/gocraft-cli";
-    private static final String TOOL_VERSION = "v0.1.0";
+    private static final String TOOL_VERSION = "v0.1.1";
 
     /// Java 25, because the runtime that loads this plugin is on 25 and a class
     /// file it cannot read is a plugin that fails at load rather than at build.

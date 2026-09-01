@@ -20,24 +20,18 @@ import org.junit.jupiter.api.io.TempDir;
 ///
 /// Everything this asserts is something a unit test would have missed: that the
 /// coordinates resolve from JitPack, that the processor runs inside javac and
-/// leaves its file where the task looks, that the downloaded packer matches its
-/// published checksum and is executable, and that what comes out has the shape
-/// the JVM runtime extracts — plugin.toml at the root, jars under payload/.
+/// leaves its file where the task looks, that the packer really is fetched from
+/// a release and really does match the checksum published beside it, and that
+/// what comes out has the shape the JVM runtime extracts — plugin.toml at the
+/// root, jars under payload/.
+///
+/// It reaches the network on purpose. Everything it exercises is a promise made
+/// to someone else's machine, and a test that stubbed the network would only
+/// assert that this code agrees with itself.
 class BundleFunctionalTest {
 
     @TempDir
     Path project;
-
-    /// The packer this build uses. A published release would be downloaded and
-    /// checksummed instead; gocraft-cli has none yet, so the test supplies one
-    /// through the same door an offline author would.
-    private static String tool() {
-        String supplied = System.getProperty("gocraft.test.tool", "");
-        org.junit.jupiter.api.Assumptions.assumeTrue(
-                !supplied.isBlank() && Files.isRegularFile(Path.of(supplied)),
-                "no gocraft-cli to test with; pass -PgocraftCli=<path>");
-        return supplied;
-    }
 
     @Test
     void buildsABundleAnAuthorCouldInstall() throws IOException {
@@ -47,10 +41,7 @@ class BundleFunctionalTest {
                     id("fr.gocraft.plugin")
                 }
 
-                gocraft {
-                    toolPath = "%s"
-                }
-                """.formatted(tool()));
+                """);
         write("plugin.toml", """
                 id      = "fr.oreo.shop"
                 version = "1.0.0"
