@@ -4,6 +4,7 @@ import fr.gocraft.abi.v1.CommandNode;
 import fr.gocraft.abi.v1.CommandNodeKind;
 import fr.gocraft.abi.v1.CommandTree;
 import fr.gocraft.api.CommandHandler;
+import fr.gocraft.api.command.CommandPaths;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -59,18 +60,15 @@ final class CommandBindings {
     }
 
     private static void index(CommandNode node, String prefix, Map<String, Integer> executors) {
-        // An argument contributes to the path in angle brackets, the way §07
-        // writes it — "shop sell <price>". It has to contribute something: the
-        // executor sits on the node that runs, so "home set <name>" and
-        // "home set" are two different commands and a handler binds to one of
-        // them, not to their parent. The brackets are what keeps an argument
-        // named "sell" from colliding with a literal of the same name.
-        String name = node.getKind() == CommandNodeKind.COMMAND_NODE_KIND_ARGUMENT
-                ? "<" + node.getName() + ">"
-                : node.getName();
-        String path = prefix.isEmpty() ? name : prefix + " " + name;
+        // Spelled by CommandPaths rather than here, because the same rule has
+        // to answer for a tree that arrived over the wire and for one a facade
+        // built in this process. Two spellings would agree until one of them
+        // changed its mind about brackets, and the symptom would be a handler
+        // that silently never runs.
+        String path = CommandPaths.join(prefix, CommandPaths.segment(node.getName(),
+                node.getKind() == CommandNodeKind.COMMAND_NODE_KIND_ARGUMENT));
         if (node.getExecutor() != 0) {
-            executors.put(normalise(path), node.getExecutor());
+            executors.put(CommandPaths.normalise(path), node.getExecutor());
         }
         for (CommandNode child : node.getChildrenList()) {
             index(child, path, executors);
@@ -88,7 +86,7 @@ final class CommandBindings {
         if (handler == null) {
             throw new IllegalArgumentException("a command handler cannot be null");
         }
-        String normalised = normalise(path == null ? "" : path);
+        String normalised = CommandPaths.normalise(path == null ? "" : path);
         Integer executor = executors.get(normalised);
         if (executor == null) {
             throw new IllegalArgumentException("no command \"" + normalised
@@ -130,12 +128,6 @@ final class CommandBindings {
 
     private String known() {
         return executors.isEmpty() ? "no commands at all" : String.join(", ", executors.keySet());
-    }
-
-    /// Case and spacing are not the contract. "Shop  Sell" and "shop sell" are
-    /// the same command to anyone typing it, so they are the same key here.
-    private static String normalise(String path) {
-        return path.trim().toLowerCase(java.util.Locale.ROOT).replaceAll("\\s+", " ");
     }
 
     /// Drops every reference to plugin code.

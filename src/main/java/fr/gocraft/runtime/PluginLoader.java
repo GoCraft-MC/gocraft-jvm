@@ -339,6 +339,19 @@ final class PluginLoader {
             commands.register(path, handler);
         }
 
+        @Override
+        public void registerCommands(fr.gocraft.api.command.CommandSet set) {
+            if (set == null) {
+                throw new IllegalArgumentException("a command set cannot be null");
+            }
+            // Registered one path at a time, through the same door a hand-written
+            // registration uses. A facade is a way of writing commands, not a
+            // second way of installing them, so it inherits every refusal the
+            // single registration already makes.
+            fr.gocraft.api.command.CommandPaths.of(set.tree())
+                    .forEach((path, executor) -> commands.register(path, set.invokers().get(executor)));
+        }
+
         /// Refusing loudly rather than dropping the listener: a subscription
         /// that silently never fires is indistinguishable from an event that
         /// never happens, and costs an afternoon to tell apart.

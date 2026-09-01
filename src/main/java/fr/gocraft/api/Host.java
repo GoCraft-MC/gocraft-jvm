@@ -72,6 +72,22 @@ public interface Host {
     ///         from a command that does not work.
     void registerCommand(String path, CommandHandler handler);
 
+    /// Registers everything one of the command facades produced.
+    ///
+    ///     host.registerCommands(ShopCommandsTree.of(new ShopCommands(store)));
+    ///     host.registerCommands(new ShopCommands(store).build());
+    ///
+    /// The set says which handler answers each path; the tree the bundle
+    /// shipped says which executor a path reaches. Only the paths have to
+    /// agree — the ids belong to whatever built the bundle, and a facade that
+    /// numbered its own differently is still describing the same commands.
+    ///
+    /// A path the bundle does not declare is refused, listing what it does
+    /// declare, because it means the bundle was built from a different source
+    /// than the code registering against it. That is worth stopping for: the
+    /// host has already told every client the command exists.
+    void registerCommands(fr.gocraft.api.command.CommandSet commands);
+
     /// Writes a line to the server console.
     ///
     /// The runtime's output is routed to the server's own, so this lands in the

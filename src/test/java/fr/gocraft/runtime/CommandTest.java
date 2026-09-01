@@ -159,6 +159,46 @@ class CommandTest {
         return registry;
     }
 
+    /// A plugin that declares its commands with a facade rather than one path
+    /// at a time.
+    ///
+    /// The ids the builder hands out start at 1; the ids the bundle assigned
+    /// are 41 and 17. Nothing reconciles them and nothing needs to: a facade
+    /// describes commands, and paths are what both sides agree on.
+    private static String facadeSource(String marker) {
+        return """
+                package test.plugin;
+
+                import fr.gocraft.api.Host;
+                import fr.gocraft.api.Plugin;
+                import fr.gocraft.api.command.ArgType;
+                import fr.gocraft.api.command.Command;
+
+                public final class FacadePlugin implements Plugin {
+                    private final Host host;
+
+                    public FacadePlugin(Host host) {
+                        this.host = host;
+                    }
+
+                    @Override
+                    public void enable() {
+                        host.registerCommands(Command.tree(Command.literal("shop")
+                                .then(Command.literal("sell")
+                                        .then(Command.arg("price", ArgType.decimal())
+                                                .executes(ctx -> {
+                                                    System.setProperty("%s.price",
+                                                            String.valueOf(ctx.decimal("price")));
+                                                    ctx.reply("Sold.");
+                                                })))
+                                .then(Command.literal("close").executes(ctx -> {
+                                    System.setProperty("%s.closed", "true");
+                                }))));
+                    }
+                }
+                """.formatted(marker, marker);
+    }
+
     // ── The tests ─────────────────────────────────────────────────────────────
 
     /// The whole path in one pass: the host's payload reaches a handler, every
@@ -315,4 +355,78 @@ class CommandTest {
                             + reply.getFail().getReason());
         }
     }
+
+    /// A facade installs through the same door a hand-written registration
+    /// uses, and the ids it invented are its own business.
+    @Test
+    void aFacadeRegistersEveryPathItDeclares(@TempDir Path directory) throws Exception {
+        String marker = "gc.command.facade";
+        Path bundle = TestBundles.bundleWithCommands(
+                directory, "FacadePlugin", facadeSource(marker), shopTree());
+        try (PluginRegistry registry = new PluginRegistry(
+                Files.createDirectories(directory.resolve("work")))) {
+            Envelope reply = registry.load(1, Load.newBuilder()
+                    .setPluginId("dev.example.shop")
+                    .setBundlePath(bundle.toString())
+                    .setEntry("test.plugin.FacadePlugin")
+                    .setCommandTree("commands.pb")
+                    .build());
+            assertTrue(reply.hasLoaded(), () -> "load failed: " + reply.getFail().getReason());
+
+            // 41 is the id the bundle gave "shop sell <price>", not the 1 the
+            // builder handed out.
+            Envelope sold = registry.invoke(4, sell(7.5));
+            assertEquals("", sold.getInvoked().getError());
+            assertEquals("7.5", System.getProperty(marker + ".price"));
+
+            Envelope closed = registry.invoke(5, Invoke.newBuilder()
+                    .setPluginId("dev.example.shop")
+                    .setExecutor(17)
+                    .setSender(sender(playerRef(PLAYER, "Alex", "java"), "Alex"))
+                    .build());
+            assertEquals("", closed.getInvoked().getError());
+            assertEquals("true", System.getProperty(marker + ".closed"));
+        }
+    }
+
+    /// A facade describing a command the bundle never shipped is refused at
+    /// load: the bundle was built from a different source than the code.
+    @Test
+    void aFacadeThatDescribesAnUnknownCommandIsRefused(@TempDir Path directory) throws Exception {
+        String source = """
+                package test.plugin;
+
+                import fr.gocraft.api.Host;
+                import fr.gocraft.api.Plugin;
+                import fr.gocraft.api.command.Command;
+
+                public final class StalePlugin implements Plugin {
+                    private final Host host;
+
+                    public StalePlugin(Host host) {
+                        this.host = host;
+                    }
+
+                    @Override
+                    public void enable() {
+                        host.registerCommands(Command.tree(
+                                Command.literal("warp").executes(ctx -> {})));
+                    }
+                }
+                """;
+        Path bundle = TestBundles.bundleWithCommands(
+                directory, "StalePlugin", source, shopTree());
+        try (PluginRegistry registry = new PluginRegistry(
+                Files.createDirectories(directory.resolve("work")))) {
+            Envelope reply = registry.load(1, Load.newBuilder()
+                    .setPluginId("dev.example.shop")
+                    .setBundlePath(bundle.toString())
+                    .setEntry("test.plugin.StalePlugin")
+                    .setCommandTree("commands.pb")
+                    .build());
+            assertTrue(reply.hasFail(), "a stale facade loaded");
+            assertTrue(reply.getFail().getReason().contains("warp"), reply.getFail().getReason());
+        }
+    }
+
 }
