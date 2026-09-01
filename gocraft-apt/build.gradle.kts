@@ -1,5 +1,6 @@
 plugins {
     java
+    `maven-publish`
 }
 
 val junitVersion: String by project
@@ -26,4 +27,12 @@ tasks.test {
         "--add-exports=jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED",
         "--add-exports=jdk.compiler/com.sun.tools.javac.main=ALL-UNNAMED",
     )
+}
+
+publishing.publications.named<MavenPublication>("maven") {
+    pom {
+        name = "gocraft-apt"
+        description = "The annotation processor that turns @Cmd and @Sub into a " +
+            "command tree, at compile time."
+    }
 }

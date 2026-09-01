@@ -2,8 +2,17 @@
 // on, and nothing else: a fact spelled in three build files is a fact free to
 // drift in two of them.
 
+import org.gradle.api.publish.maven.plugins.MavenPublishPlugin
+
 val javaVersion: String by project
 
+val repositoryUrl = "https://github.com/GoCraft-MC/gocraft-jvm"
+
+// The group a plugin author writes. It is fr.gocraft because that is where
+// these artefacts are meant to end up, on Maven Central under a namespace
+// backed by gocraft.fr; publishing there needs the domain proven, and until it
+// is, JitPack serves the same builds under com.github.GoCraft-MC. Declaring
+// com.github.* here instead would bake the interim host into the artefact.
 allprojects {
     group = "fr.gocraft"
     version = "0.1.0"
@@ -20,6 +29,36 @@ allprojects {
         extensions.configure<JavaPluginExtension> {
             toolchain {
                 languageVersion = JavaLanguageVersion.of(javaVersion)
+            }
+            // A plugin author reads these types more than they read the
+            // javadoc for them, and an IDE that can step into the API is worth
+            // more than the few kilobytes.
+            withSourcesJar()
+        }
+    }
+
+    // What every published artefact says about where it came from. The name and
+    // the description are the artefact's own business and live in its build
+    // file; everything here is a fact about the repository, and a fact spelled
+    // three times is a fact free to drift in two of them.
+    plugins.withType<MavenPublishPlugin>().configureEach {
+        extensions.configure<PublishingExtension> {
+            publications.create<MavenPublication>("maven") {
+                from(components["java"])
+                pom {
+                    url = repositoryUrl
+                    developers {
+                        developer {
+                            id = "Traqueur"
+                            name = "Traqueur_"
+                        }
+                    }
+                    scm {
+                        url = repositoryUrl
+                        connection = "scm:git:$repositoryUrl.git"
+                        developerConnection = "scm:git:ssh://git@github.com/GoCraft-MC/gocraft-jvm.git"
+                    }
+                }
             }
         }
     }

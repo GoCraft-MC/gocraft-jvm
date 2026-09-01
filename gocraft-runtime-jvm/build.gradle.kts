@@ -6,6 +6,7 @@
 
 plugins {
     java
+    `maven-publish`
 }
 
 // Must equal the plugin version pinned in buf.gen.yaml. The generated sources
@@ -105,4 +106,12 @@ tasks.test {
     // deprecation, and the four warning lines it prints are not something
     // anyone here can act on.
     jvmArgs("--sun-misc-unsafe-memory-access=allow")
+}
+
+publishing.publications.named<MavenPublication>("maven") {
+    pom {
+        name = "gocraft-runtime-jvm"
+        description = "The host the GoCraft server spawns to run JVM plugins. " +
+            "A plugin does not depend on this."
+    }
 }

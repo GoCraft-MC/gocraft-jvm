@@ -7,6 +7,7 @@
 
 plugins {
     `java-library`
+    `maven-publish`
 }
 
 val junitVersion: String by project
@@ -25,5 +26,12 @@ sourceSets {
         java {
             srcDir("src/main/generated")
         }
+    }
+}
+
+publishing.publications.named<MavenPublication>("maven") {
+    pom {
+        name = "gocraft-api-jvm"
+        description = "The API a JVM plugin for the GoCraft server is written against."
     }
 }

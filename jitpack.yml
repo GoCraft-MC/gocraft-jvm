@@ -1,0 +1,21 @@
+# How JitPack builds this repository.
+#
+# JitPack is the interim Maven host: it builds from a git tag on demand and
+# serves the result, which sidesteps Maven Central's requirement that fr.gocraft
+# be backed by a proven claim to gocraft.fr. The coordinates it serves are
+# com.github.GoCraft-MC.*, so moving to Central later is a public rename — which
+# is why the Gradle plugin should be what declares these dependencies, not each
+# plugin author's build file.
+#
+# The JDK below is only what runs Gradle. The build compiles against Java 25,
+# which Gradle downloads itself through the foojay resolver in
+# settings.gradle.kts — so this does not have to be 25, and JitPack does not
+# have to offer it.
+jdk:
+  - openjdk17
+
+# Named rather than left to detection. JitPack guesses a task for Gradle
+# projects, and the guess it inherited from older Gradle (`install`) has not
+# existed for years.
+install:
+  - ./gradlew --no-daemon publishToMavenLocal

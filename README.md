@@ -68,6 +68,32 @@ for a week. `LoadedPlugin` exists to hold everything that must be released, and
 `releasesEveryClassloaderItLoads` cycles twenty-five loads while watching weak
 references.
 
+## Using it
+
+The artefacts are served by [JitPack](https://jitpack.io) until they can go to
+Maven Central: `fr.gocraft` needs a proven claim to `gocraft.fr`, and JitPack
+needs nothing but a tag.
+
+```kotlin
+repositories {
+    mavenCentral()
+    maven { url = uri("https://jitpack.io") }
+}
+
+dependencies {
+    compileOnly("com.github.GoCraft-MC.gocraft-jvm:gocraft-api-jvm:<tag>")
+    annotationProcessor("com.github.GoCraft-MC.gocraft-jvm:gocraft-apt:<tag>")
+}
+```
+
+`compileOnly` is the right scope and not a shortcut: the runtime already carries
+the API, and a plugin that shipped its own copy would load classes the host does
+not recognise as its own.
+
+Those coordinates are JitPack's, not ours, and they change the day these move to
+Central. The Gradle plugin (deliverable 11) exists partly so that a plugin
+author never writes them by hand.
+
 ## Building
 
 Java 25 and Gradle. Nothing else: the ABI sources are committed, so buf and a

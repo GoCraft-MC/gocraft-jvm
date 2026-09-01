@@ -1,3 +1,14 @@
+// Gradle fetches the JDK it needs rather than requiring one to be installed.
+//
+// The baseline is Java 25, and a build machine that has it is the exception —
+// JitPack, CI images and most contributors' laptops ship something older. This
+// resolver lets the toolchain be downloaded on demand, so `./gradlew build`
+// works on any JDK new enough to run Gradle itself, and an installed 25 is
+// still found first.
+plugins {
+    id("org.gradle.toolchains.foojay-resolver-convention") version "1.0.0"
+}
+
 rootProject.name = "gocraft-jvm"
 
 // Three artefacts, because three different machines run them.
