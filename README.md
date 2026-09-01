@@ -1,8 +1,16 @@
 # gocraft-jvm
 
 The JVM side of the [GoCraft](https://github.com/GoCraft-MC/GoCraft) plugin
-system. It produces `gocraft-runtime.jar`, the process the server spawns to host
-Java plugins.
+system. It produces three artefacts, because three different machines run them:
+
+| Artefact | Who runs it |
+| --- | --- |
+| `gocraft-api-jvm` | the plugin. The only one an author names, and it has no dependencies at all |
+| `gocraft-runtime-jvm` | the server, which extracts and spawns `gocraft-runtime.jar` |
+| `gocraft-apt` | javac, while a plugin is compiled, and never again |
+
+Keeping them apart is what keeps a plugin's classpath free of protobuf, of the
+loader, and of a code generator.
 
 It is not a Minecraft server, and it is not GoCraft ported to Java. GoCraft is
 written in Go; this is one of the language backends its plugin system can drive,
@@ -69,7 +77,8 @@ GoCraft checkout are needed only to regenerate them.
 ./gradlew build
 ```
 
-The jar lands in `build/libs/gocraft-runtime.jar`, around 1.1 MB.
+The runtime jar lands in `gocraft-runtime-jvm/build/libs/gocraft-runtime.jar`,
+around 1.3 MB; the API jar in `gocraft-api-jvm/build/libs/`, around 65 KB.
 
 ## Running it against GoCraft
 
@@ -82,7 +91,7 @@ path or one relative to the server's working directory:
 plugins:
   runtimes:
     jvm:
-      jar_path: /path/to/gocraft-jvm/build/libs/gocraft-runtime.jar
+      jar_path: /path/to/gocraft-jvm/gocraft-runtime-jvm/build/libs/gocraft-runtime.jar
 ```
 
 ## The ABI
@@ -96,7 +105,8 @@ is a second definition, free to drift without anything noticing.
 ```
 
 Two versions have to move together and are pinned in two places that must agree:
-the plugin in `buf.gen.yaml` and `protobuf-javalite` in `build.gradle.kts`.
+the plugin in `gocraft-runtime-jvm/buf.gen.yaml` and `protobuf-javalite` in
+`gocraft-runtime-jvm/build.gradle.kts`.
 Gencode from a newer protobuf calls methods an older runtime does not have, and
 it surfaces as dozens of `cannot find symbol` errors in files nobody edited.
 
