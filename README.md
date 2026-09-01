@@ -12,6 +12,151 @@ system. It produces three artefacts, because three different machines run them:
 Keeping them apart is what keeps a plugin's classpath free of protobuf, of the
 loader, and of a code generator.
 
+## Writing a plugin
+
+Three things, and the build turns them into one `.gcpkg` file the server reads.
+
+**1. `plugin.toml`**, at the root of your project:
+
+```toml
+id      = "fr.oreo.shop"
+version = "1.0.0"
+api     = 1
+runtime = "jvm"
+entry   = "fr.oreo.shop.ShopPlugin"   # your class, not a jar path
+
+[subscribe]
+events = ["player.join", "block.break"]
+perms  = ["shop.use"]
+
+[commands]
+tree = "commands.pb"                  # only if you declare commands
+```
+
+`[subscribe] events` is not decoration: the host sends you nothing you did not
+ask for. And `perms` is what lets an event answer `can("shop.use")` from a map
+instead of a round trip while the tick waits.
+
+**2. A class implementing `Plugin`**, with one constructor:
+
+```java
+public final class ShopPlugin implements Plugin {
+    private final Host host;
+
+    public ShopPlugin(Host host) {   // injected by type, from a closed list
+        this.host = host;
+    }
+
+    @Override public void enable()  { host.log("open for business"); }
+    @Override public void disable() { /* only what you opened yourself */ }
+}
+```
+
+No `static main` and no `extends JavaPlugin`. The runtime hosts many plugins in
+one JVM, so a `main` would mean ten of them each claiming to own the process;
+and dependencies through the constructor mean your fields are `final` with no
+half-initialised window — the source of one NPE in two in Bukkit plugins.
+
+Nothing you keep in a field survives a respawn. The runtime is a separate
+process the server can kill and restart while it keeps running, so in-memory
+state is a cache, never a record.
+
+**3. Commands, if you have any** — see below.
+
+### Your build
+
+```kotlin
+repositories {
+    mavenCentral()
+    maven { url = uri("https://jitpack.io") }
+}
+
+dependencies {
+    compileOnly("com.github.GoCraft-MC.gocraft-jvm:gocraft-api-jvm:v0.1.0")
+    annotationProcessor("com.github.GoCraft-MC.gocraft-jvm:gocraft-apt:v0.1.0")
+    // Served by JitPack until Maven Central; see below for why.
+}
+```
+
+`compileOnly` is right and not a shortcut: the runtime already carries the API,
+and a plugin shipping its own copy would load classes the host does not
+recognise as its own. `annotationProcessor` is only needed if you use the
+annotations.
+
+Then:
+
+```sh
+./gradlew build
+go run github.com/GoCraft-MC/gocraft-cli@latest \
+    build -commands build/classes/java/main/gocraft/commands.json \
+    -o shop.gcpkg .
+```
+
+`gocraft-apt` wrote that JSON while javac compiled you. `gocraft-cli` turns it
+into the `commands.pb` in the bundle — the same program, reading the same kind
+of file, as for a Go plugin.
+
+### Declaring commands
+
+Three ways to say it, one tree underneath. They are not three systems: the
+annotations compile into builder calls, and the inheritance shim accumulates
+into the same builder. Pick per command, mix within a plugin.
+
+**Annotations**, when the shape is static:
+
+```java
+@Cmd("shop") @Permission("shop.use")
+public final class ShopCommands {
+
+    @Sub("sell <price>")
+    void sell(CommandSender sender, @Range(min = 0.01, max = 1000) double price) { }
+
+    @Sub("admin reload") @Permission("shop.admin")
+    void reload(CommandSender sender) { }
+
+    @Sub("say <message>")
+    void say(CommandSender sender, @Greedy String message) { }
+}
+```
+
+The argument type comes from the method signature — `double` is a decimal,
+`PlayerRef` a player, `BlockPos` a position, an `enum` its own constants. A path
+naming an argument the method does not take, or a parameter the path never asks
+for, is a compile error rather than a command that never runs.
+
+`@Permission` on a method guards the **last** literal of its path, not the
+first: on `@Sub("admin reload")` it guards `reload`, which is the more precise
+of the two.
+
+**The builder**, when the shape is decided at runtime:
+
+```java
+CommandSet commands = Command.tree(
+    Command.literal("shop").permission("shop.use")
+        .then(Command.literal("sell")
+            .then(Command.arg("price", new ArgType.Decimal(0.01, 1000.0))
+                .executes(context -> sell(context.sender(), context.decimal("price")))))
+);
+host.registerCommands(commands);
+```
+
+**Inheritance**, if you are migrating from a plugin shaped that way:
+
+```java
+public final class ShopCommands extends SubCommand {
+    public ShopCommands() {
+        super("shop");
+        permission("shop.use");
+        add(Command.literal("sell").executes(context -> { ... }));
+    }
+}
+host.registerCommands(new ShopCommands().build());
+```
+
+Whichever you use, the executor ids are minted by `gocraft-cli` and never by
+you: handlers bind to paths (`shop sell <price>`), so inserting a command above
+another cannot silently renumber it.
+
 It is not a Minecraft server, and it is not GoCraft ported to Java. GoCraft is
 written in Go; this is one of the language backends its plugin system can drive,
 alongside a future Lua and Python one.
@@ -68,29 +213,14 @@ for a week. `LoadedPlugin` exists to hold everything that must be released, and
 `releasesEveryClassloaderItLoads` cycles twenty-five loads while watching weak
 references.
 
-## Using it
+## Where the artefacts come from
 
-The artefacts are served by [JitPack](https://jitpack.io) until they can go to
-Maven Central: `fr.gocraft` needs a proven claim to `gocraft.fr`, and JitPack
-needs nothing but a tag.
+[JitPack](https://jitpack.io), until they can go to Maven Central: `fr.gocraft`
+needs a proven claim to `gocraft.fr`, and JitPack needs nothing but a tag. It
+builds from the tag on demand, so pushing one is the whole publication step —
+see [Writing a plugin](#writing-a-plugin) for the coordinates.
 
-```kotlin
-repositories {
-    mavenCentral()
-    maven { url = uri("https://jitpack.io") }
-}
-
-dependencies {
-    compileOnly("com.github.GoCraft-MC.gocraft-jvm:gocraft-api-jvm:<tag>")
-    annotationProcessor("com.github.GoCraft-MC.gocraft-jvm:gocraft-apt:<tag>")
-}
-```
-
-`compileOnly` is the right scope and not a shortcut: the runtime already carries
-the API, and a plugin that shipped its own copy would load classes the host does
-not recognise as its own.
-
-Those coordinates are JitPack's, not ours, and they change the day these move to
+They are JitPack's coordinates, not ours, and they change the day these move to
 Central. The Gradle plugin (deliverable 11) exists partly so that a plugin
 author never writes them by hand.
 
