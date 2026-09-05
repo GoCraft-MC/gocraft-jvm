@@ -42,6 +42,30 @@ class GoCraftPluginTest {
                 coordinates(project, JavaPlugin.ANNOTATION_PROCESSOR_CONFIGURATION_NAME));
     }
 
+    /// The escape hatch that makes an unreleased API testable.
+    ///
+    /// JitPack publishes under a group derived from the repository path, which
+    /// is not the group this project declares — so publishToMavenLocal writes
+    /// fr.gocraft:* while the default coordinates ask for com.github.*. Without
+    /// this, the only way to try a change to the API against a real plugin
+    /// build is to tag it, which is the one thing that cannot be undone.
+    ///
+    /// The version loses its `v` with the group: that prefix is JitPack serving
+    /// a tag verbatim, and a Maven repository holds the version as declared.
+    @Test
+    void resolvesFromAnotherGroupWhenTheBuildSaysSo() throws IOException {
+        Project project = ProjectBuilder.builder().withName("shop").build();
+        project.getExtensions().getExtraProperties()
+                .set("gocraft.artefactGroup", "fr.gocraft");
+        project.getPluginManager().apply(GoCraftPlugin.class);
+
+        String coordinates = coordinates(project, JavaPlugin.COMPILE_ONLY_CONFIGURATION_NAME);
+        assertTrue(coordinates.contains("fr.gocraft:gocraft-api-jvm:" + declaredVersion()),
+                coordinates);
+        assertTrue(!coordinates.contains(":v" + declaredVersion()),
+                "the JitPack tag prefix followed the group it belongs to: " + coordinates);
+    }
+
     /// compileOnly and not implementation: the runtime already carries the API,
     /// and a plugin shipping its own copy loads classes the host does not
     /// recognise as its own — the mistake that costs an afternoon in a
