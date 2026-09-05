@@ -95,7 +95,62 @@ public final class EventProcessor extends AbstractProcessor {
         if (diagnostics.failed()) {
             return;
         }
+        if (!hasLayoutConstructor(type, layout)) {
+            diagnostics.error("a plugin event is built from the values that arrive, so it needs "
+                    + "`" + type.getSimpleName() + "(" + signature(layout) + ")` — every field in "
+                    + "declaration order. Without it a plugin subscribing to this event has "
+                    + "nothing to hand its handler", type);
+            return;
+        }
         write(type, declared, layout, diagnostics);
+    }
+
+    /// Whether the event can be rebuilt from a payload.
+    ///
+    /// The publishing side never needs this: it constructs the event itself,
+    /// however it likes. A subscriber does — it holds its own class matching the
+    /// provider's layout, and there is no shared type to hand it — so the
+    /// requirement is checked for every event rather than only for the ones
+    /// somebody happens to subscribe to. An event that gains a subscriber a year
+    /// later should not fail then.
+    private boolean hasLayoutConstructor(TypeElement owner, List<Field> layout) {
+        for (Element member : owner.getEnclosedElements()) {
+            if (member.getKind() != ElementKind.CONSTRUCTOR) {
+                continue;
+            }
+            ExecutableElement candidate = (ExecutableElement) member;
+            if (candidate.getModifiers().contains(Modifier.PRIVATE)) {
+                // The generated codec sits in the same package, so anything
+                // else it can call.
+                continue;
+            }
+            List<? extends VariableElement> parameters = candidate.getParameters();
+            if (parameters.size() != layout.size()) {
+                continue;
+            }
+            boolean matches = true;
+            for (int index = 0; index < layout.size(); index++) {
+                if (!parameters.get(index).asType().toString().equals(layout.get(index).declared())) {
+                    matches = false;
+                    break;
+                }
+            }
+            if (matches) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private String signature(List<Field> layout) {
+        StringBuilder types = new StringBuilder();
+        for (Field field : layout) {
+            if (!types.isEmpty()) {
+                types.append(", ");
+            }
+            types.append(field.declared()).append(' ').append(field.name());
+        }
+        return types.toString();
     }
 
     /// Works out how one field crosses the wire, or says why it cannot.

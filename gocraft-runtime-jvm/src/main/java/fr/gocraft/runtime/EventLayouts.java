@@ -1,6 +1,6 @@
 package fr.gocraft.runtime;
 
-import fr.gocraft.api.EventLayout;
+import fr.gocraft.api.CustomEvent;
 
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -22,13 +22,13 @@ import java.util.concurrent.ConcurrentHashMap;
 /// another route. [#forget] is what unload calls.
 final class EventLayouts {
 
-    private static final Map<Class<?>, EventLayout> CACHE = new ConcurrentHashMap<>();
+    private static final Map<Class<?>, CustomEvent> CACHE = new ConcurrentHashMap<>();
 
     private EventLayouts() {
     }
 
     /// The codec for this event, or null when the class was never annotated.
-    static EventLayout of(Class<?> event) {
+    static CustomEvent of(Class<?> event) {
         return CACHE.computeIfAbsent(event, EventLayouts::resolve);
     }
 
@@ -38,15 +38,15 @@ final class EventLayouts {
         CACHE.keySet().removeIf(event -> event.getClassLoader() == loader);
     }
 
-    private static EventLayout resolve(Class<?> event) {
+    private static CustomEvent resolve(Class<?> event) {
         String name = event.getName() + "Layout";
         try {
             Class<?> generated = Class.forName(name, true, event.getClassLoader());
-            return (EventLayout) generated.getDeclaredConstructor().newInstance();
+            return (CustomEvent) generated.getDeclaredConstructor().newInstance();
         } catch (ClassNotFoundException absent) {
-            // Not annotated, or compiled without the processor on the path. The
-            // caller turns this into a message naming both ways to declare an
-            // event, because from here the two are indistinguishable.
+            // Not annotated, or compiled without the processor on the path.
+            // Indistinguishable from here, so the caller names both in one
+            // message rather than guessing which it was.
             return null;
         } catch (ReflectiveOperationException | ClassCastException broken) {
             throw new IllegalStateException(name + " is not a usable event codec; rebuild the "

@@ -4,7 +4,6 @@ import fr.gocraft.abi.v1.Emit;
 import fr.gocraft.abi.v1.Emitted;
 import fr.gocraft.abi.v1.Mutation;
 import fr.gocraft.api.CustomEvent;
-import fr.gocraft.api.EventLayout;
 import fr.gocraft.api.Value;
 
 import java.io.IOException;
@@ -60,27 +59,36 @@ final class Emissions {
         return !answer.getCancelled();
     }
 
-    /// One published event, whichever way its author declared it.
+    /// One published event and the codec the build wrote for it.
     ///
-    /// Two facades, one shape underneath — the same fan-in §07 uses for
-    /// commands. @PluginEvent is a shorthand the build expands; CustomEvent is
-    /// the same three answers written by hand. Neither reaches the wire
-    /// differently, so nothing below this line knows which was used.
-    private record Published(String type, List<Value> fields, java.util.function.Consumer<List<Value>> write) {
+    /// One route, not two. A second way to declare an event — an interface the
+    /// class implemented by hand — would be the same layout written twice, once
+    /// in the code and once in the manifest the build checks it against, free
+    /// to disagree wherever nothing compares them. The annotation is the single
+    /// source and this is what it produces.
+    private record Published(CustomEvent codec, Object event) {
+
+        String type() {
+            return codec.eventType();
+        }
+
+        List<Value> fields() {
+            return codec.fields(event);
+        }
+
+        void write(List<Value> fields) {
+            codec.setFields(event, fields);
+        }
     }
 
     private static Published describe(Object event) {
-        if (event instanceof CustomEvent custom) {
-            return new Published(custom.eventType(), custom.fields(), custom::setFields);
-        }
-        EventLayout layout = EventLayouts.of(event.getClass());
-        if (layout == null) {
+        CustomEvent codec = EventLayouts.of(event.getClass());
+        if (codec == null) {
             throw new IllegalArgumentException(event.getClass().getName()
-                    + " is not an event. Annotate it with @PluginEvent and let gocraft-apt write "
-                    + "its codec, or implement " + CustomEvent.class.getName() + " by hand");
+                    + " is not an event. Annotate it with @PluginEvent, and make sure gocraft-apt "
+                    + "is on the annotation processor path so it can write the codec");
         }
-        return new Published(layout.eventType(), layout.fields(event),
-                fields -> layout.setFields(event, fields));
+        return new Published(codec, event);
     }
 
     /// Applies what the subscribers changed to the values that were published.
@@ -102,6 +110,6 @@ final class Emissions {
             }
             updated = ValuePaths.apply(updated, path, EventCodec.value(mutation.getValue()));
         }
-        event.write().accept(List.copyOf(updated));
+        event.write(List.copyOf(updated));
     }
 }

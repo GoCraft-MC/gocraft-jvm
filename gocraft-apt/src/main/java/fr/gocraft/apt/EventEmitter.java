@@ -28,7 +28,7 @@ final class EventEmitter {
             line(0, "package " + packageName + ";");
             blank();
         }
-        line(0, "import fr.gocraft.api.EventLayout;");
+        line(0, "import fr.gocraft.api.CustomEvent;");
         line(0, "import fr.gocraft.api.Value;");
         line(0, "import java.util.List;");
         blank();
@@ -39,11 +39,17 @@ final class EventEmitter {
         line(0, "// Field order is the wire contract. Appending one is safe; reordering or");
         line(0, "// removing one shifts every index for everyone already compiled against");
         line(0, "// this event.");
-        line(0, "public final class " + generated + " implements EventLayout {");
+        line(0, "public final class " + generated + " implements CustomEvent {");
         blank();
         line(1, "@Override");
         line(1, "public String eventType() {");
         line(2, "return \"" + declared.value() + "\";");
+        line(1, "}");
+        blank();
+
+        line(1, "@Override");
+        line(1, "public boolean cancellable() {");
+        line(2, "return " + declared.cancellable() + ";");
         line(1, "}");
         blank();
 
@@ -87,6 +93,35 @@ final class EventEmitter {
                 line(2, "}");
             }
         }
+        line(1, "}");
+        blank();
+
+        // Building the event a subscriber receives. The values arrived from
+        // another plugin, so every one of them is checked: a kind that does not
+        // match means the two compiled against different versions of the
+        // layout, and constructing anyway would hand the handler a zero it
+        // would read as a real price.
+        line(1, "@Override");
+        line(1, "public Object create(List<Value> fields) {");
+        line(2, "if (fields.size() < " + layout.size() + ") {");
+        line(3, "throw new IllegalArgumentException(\"" + declared.value() + " arrived with \""
+                + " + fields.size() + \" fields, its layout declares " + layout.size() + "\");");
+        line(2, "}");
+        for (int index = 0; index < layout.size(); index++) {
+            EventProcessor.Field field = layout.get(index);
+            line(2, "if (!(fields.get(" + index + ") instanceof Value." + field.kind().record
+                    + "(" + carried(field) + " " + field.name() + "))) {");
+            line(3, "throw new IllegalArgumentException(\"field " + index + " of "
+                    + declared.value() + " is not a " + field.kind().record.toLowerCase() + "\");");
+            line(2, "}");
+        }
+        line(2, "return new " + simple + "(");
+        for (int index = 0; index < layout.size(); index++) {
+            EventProcessor.Field field = layout.get(index);
+            String comma = index == layout.size() - 1 ? "" : ",";
+            line(3, narrow(field) + comma);
+        }
+        line(2, ");");
         line(1, "}");
         line(0, "}");
         return out.toString();
