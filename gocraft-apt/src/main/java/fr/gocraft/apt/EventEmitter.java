@@ -10,13 +10,7 @@ import java.util.List;
 /// are the author's and are usually private — and reaching past them with
 /// reflection would trade a compile error for a runtime one, on a path the tick
 /// is waiting on.
-///
-/// Reading widens for free: an `int` fits the `long` a Value.Int carries.
-/// Writing has to narrow explicitly, which is why the declared type travels
-/// this far.
-final class EventEmitter {
-
-    private final StringBuilder out = new StringBuilder();
+final class EventEmitter extends ValueEmitter {
 
     String render(String qualified, PluginEvent declared, List<EventProcessor.Field> layout) {
         int lastDot = qualified.lastIndexOf('.');
@@ -54,24 +48,41 @@ final class EventEmitter {
         line(1, "}");
         blank();
 
+        writeFields(simple, layout);
+        blank();
+        writeSetFields(simple, layout);
+        blank();
+        writeCreate(simple, declared, layout);
+
+        if (carriesAPlayer(layout)) {
+            writePlayerHelper();
+        }
+        line(0, "}");
+        return out.toString();
+    }
+
+    private void writeFields(String simple, List<EventProcessor.Field> layout) {
         line(1, "@Override");
         line(1, "public List<Value> fields(Object event) {");
         if (layout.isEmpty()) {
             line(2, "return List.of();");
-        } else {
-            line(2, simple + " target = (" + simple + ") event;");
-            line(2, "return List.of(");
-            for (int index = 0; index < layout.size(); index++) {
-                EventProcessor.Field field = layout.get(index);
-                String comma = index == layout.size() - 1 ? "" : ",";
-                line(3, "new Value." + field.kind().record + "(target." + field.name() + "())"
-                        + comma);
-            }
-            line(2, ");");
+            line(1, "}");
+            return;
         }
+        line(2, simple + " target = (" + simple + ") event;");
+        List<String> expressions = new java.util.ArrayList<>(layout.size());
+        for (EventProcessor.Field field : layout) {
+            expressions.add(encodeField(2, field, "target." + field.name() + "()"));
+        }
+        line(2, "return List.of(");
+        for (int index = 0; index < expressions.size(); index++) {
+            line(3, expressions.get(index) + (index + 1 == expressions.size() ? "" : ","));
+        }
+        line(2, ");");
         line(1, "}");
-        blank();
+    }
 
+    private void writeSetFields(String simple, List<EventProcessor.Field> layout) {
         line(1, "@Override");
         line(1, "public void setFields(Object event, List<Value> fields) {");
         if (!hasMutable(layout)) {
@@ -81,27 +92,34 @@ final class EventEmitter {
             line(2, layout.isEmpty()
                     ? "// This event carries nothing, so there is nothing to write back."
                     : "// Every field is final: this event is read-only to subscribers.");
-        } else {
-            line(2, simple + " target = (" + simple + ") event;");
-            for (int index = 0; index < layout.size(); index++) {
-                EventProcessor.Field field = layout.get(index);
-                if (!field.mutable()) {
-                    continue;
-                }
-                line(2, "if (fields.get(" + index + ") instanceof Value." + field.kind().record
-                        + "(" + carried(field) + " " + field.name() + ")) {");
-                line(3, "target." + field.setter() + "(" + narrow(field) + ");");
-                line(2, "}");
+            line(1, "}");
+            return;
+        }
+        line(2, simple + " target = (" + simple + ") event;");
+        for (int index = 0; index < layout.size(); index++) {
+            EventProcessor.Field field = layout.get(index);
+            if (!field.mutable()) {
+                continue;
             }
+            // Each write stands alone: one field arriving in a shape this build
+            // does not read must not lose the others, since the host applied
+            // them all and the emitter's object has to end up where the dispatch
+            // got to.
+            line(2, "try {");
+            decodeValue(3, field.carried(), "fields.get(" + index + ")", field.name(),
+                    "field " + index);
+            line(3, "target." + field.setter() + "(" + field.name() + ");");
+            line(2, "} catch (RuntimeException ignored) {");
+            line(2, "}");
         }
         line(1, "}");
-        blank();
+    }
 
-        // Building the event a subscriber receives. The values arrived from
-        // another plugin, so every one of them is checked: a kind that does not
-        // match means the two compiled against different versions of the
-        // layout, and constructing anyway would hand the handler a zero it
-        // would read as a real price.
+    private void writeCreate(String simple, PluginEvent declared,
+            List<EventProcessor.Field> layout) {
+        // Building the event a subscriber receives. Every value is checked: a
+        // kind that does not match means the two plugins compiled against
+        // different versions of the layout.
         line(1, "@Override");
         line(1, "public Object create(List<Value> fields, EffectSink sink) {");
         line(2, "if (fields.size() < " + layout.size() + ") {");
@@ -110,51 +128,18 @@ final class EventEmitter {
         line(2, "}");
         for (int index = 0; index < layout.size(); index++) {
             EventProcessor.Field field = layout.get(index);
-            line(2, "if (!(fields.get(" + index + ") instanceof Value." + field.kind().record
-                    + "(" + carried(field) + " " + field.name() + "))) {");
-            line(3, "throw new IllegalArgumentException(\"field " + index + " of "
-                    + declared.value() + " is not a " + field.kind().record.toLowerCase() + "\");");
-            line(2, "}");
+            decodeValue(2, field.carried(), "fields.get(" + index + ")", field.name(),
+                    "field " + index + " of " + declared.value());
         }
         line(2, "return new " + simple + "(");
         for (int index = 0; index < layout.size(); index++) {
-            EventProcessor.Field field = layout.get(index);
-            String comma = index == layout.size() - 1 ? "" : ",";
-            line(3, narrow(field) + comma);
+            line(3, layout.get(index).name() + (index + 1 == layout.size() ? "" : ","));
         }
         line(2, ");");
         line(1, "}");
-        line(0, "}");
-        return out.toString();
-    }
-
-    /// The type the Value record hands back, which is not always the field's.
-    private String carried(EventProcessor.Field field) {
-        return switch (field.kind()) {
-            case BOOL -> "boolean";
-            case INT -> "long";
-            case DECIMAL -> "double";
-            case TEXT -> "String";
-            case BYTES -> "byte[]";
-        };
-    }
-
-    private String narrow(EventProcessor.Field field) {
-        if (field.kind().narrows() && !field.declared().equals(carried(field))) {
-            return "(" + field.declared() + ") " + field.name();
-        }
-        return field.name();
     }
 
     private static boolean hasMutable(List<EventProcessor.Field> layout) {
         return layout.stream().anyMatch(EventProcessor.Field::mutable);
-    }
-
-    private void line(int depth, String text) {
-        out.append("    ".repeat(depth)).append(text).append('\n');
-    }
-
-    private void blank() {
-        out.append('\n');
     }
 }

@@ -1,11 +1,15 @@
 package fr.gocraft.apt;
 
+import fr.gocraft.api.EventValue;
 import fr.gocraft.api.PluginEvent;
 
 import java.io.IOException;
 import java.io.Writer;
 import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import javax.annotation.processing.AbstractProcessor;
 import javax.annotation.processing.RoundEnvironment;
@@ -34,7 +38,7 @@ import javax.tools.StandardLocation;
 /// accessor, a mutable field with no setter, a type no runtime can carry. The
 /// author sees them underlined rather than as a plugin that loads and then
 /// fails to publish anything.
-@SupportedAnnotationTypes("fr.gocraft.api.PluginEvent")
+@SupportedAnnotationTypes({"fr.gocraft.api.PluginEvent", "fr.gocraft.api.EventValue"})
 public final class EventProcessor extends AbstractProcessor {
 
     @Override
@@ -46,14 +50,34 @@ public final class EventProcessor extends AbstractProcessor {
     /// once and javac hands them over a round at a time.
     private final List<LayoutDump.Declared> declared = new ArrayList<>();
 
+    /// The records seen so far, by manifest name, with their layouts and the
+    /// class each came from.
+    ///
+    /// Kept because a cycle is a property of the whole graph and javac hands the
+    /// classes over a round at a time: a record reaching itself through another
+    /// cannot be seen while looking at either one alone.
+    private final Map<String, List<Field>> records = new LinkedHashMap<>();
+    private final Map<String, String> recordClasses = new LinkedHashMap<>();
+
     @Override
     public boolean process(Set<? extends TypeElement> annotations, RoundEnvironment round) {
         Diagnostics diagnostics = new Diagnostics(processingEnv.getMessager());
         if (round.processingOver()) {
             // Written last, when there is nothing more to add. A dump per round
             // would describe whichever events that round happened to carry.
+            detectCycles(diagnostics);
             writeDump(diagnostics);
             return true;
+        }
+        // Records first, so an event naming one is resolved against a layout
+        // this round has already read rather than against the annotation alone.
+        for (Element element : round.getElementsAnnotatedWith(EventValue.class)) {
+            if (element.getKind() != ElementKind.CLASS) {
+                diagnostics.error("@EventValue declares something an event carries, so it "
+                        + "belongs on a class", element);
+                continue;
+            }
+            declareRecord((TypeElement) element, diagnostics);
         }
         for (Element element : round.getElementsAnnotatedWith(PluginEvent.class)) {
             if (element.getKind() != ElementKind.CLASS) {
@@ -87,23 +111,7 @@ public final class EventProcessor extends AbstractProcessor {
             return;
         }
 
-        List<Field> layout = new ArrayList<>();
-        for (Element member : type.getEnclosedElements()) {
-            if (member.getKind() != ElementKind.FIELD) {
-                continue;
-            }
-            VariableElement field = (VariableElement) member;
-            if (field.getModifiers().contains(Modifier.STATIC)) {
-                // A constant is not part of the event: it has the same value in
-                // every instance, so carrying it would be paying per emission
-                // for something the subscriber's own code already has.
-                continue;
-            }
-            Field resolved = resolve(type, field, diagnostics);
-            if (resolved != null) {
-                layout.add(resolved);
-            }
-        }
+        List<Field> layout = layoutOf(type, diagnostics);
         if (diagnostics.failed()) {
             return;
         }
@@ -118,19 +126,168 @@ public final class EventProcessor extends AbstractProcessor {
         this.declared.add(new LayoutDump.Declared(declared, layout));
     }
 
+    /// The positional layout of one class: its instance fields, in declaration
+    /// order.
+    ///
+    /// Shared by events and records because a record is an event's payload one
+    /// level down, and the rules are the same rules — order is the wire order,
+    /// final means read-only, an accessor is how the codec reads it.
+    private List<Field> layoutOf(TypeElement type, Diagnostics diagnostics) {
+        List<Field> layout = new ArrayList<>();
+        for (Element member : type.getEnclosedElements()) {
+            if (member.getKind() != ElementKind.FIELD) {
+                continue;
+            }
+            VariableElement field = (VariableElement) member;
+            if (field.getModifiers().contains(Modifier.STATIC)) {
+                // A constant is not part of the payload: it has the same value
+                // in every instance, so carrying it would be paying per emission
+                // for something the subscriber's own code already has.
+                continue;
+            }
+            Field resolved = resolve(type, field, diagnostics);
+            if (resolved != null) {
+                layout.add(resolved);
+            }
+        }
+        return layout;
+    }
+
+    /// Reads one @EventValue class and writes its codec.
+    ///
+    /// A record has no setFields. What is written back into an author's object
+    /// is the event's own fields, one level up; the host applies a deep mutation
+    /// against the values rather than against anybody's object.
+    private void declareRecord(TypeElement type, Diagnostics diagnostics) {
+        if (type.getNestingKind() != NestingKind.TOP_LEVEL) {
+            diagnostics.error("an @EventValue class must be top-level, so its codec can sit "
+                    + "beside it", type);
+            return;
+        }
+        if (type.getModifiers().contains(Modifier.ABSTRACT)) {
+            diagnostics.error("an @EventValue class is built from what arrives, so it cannot be "
+                    + "abstract", type);
+            return;
+        }
+        String qualified = type.getQualifiedName().toString();
+        String name = type.getAnnotation(EventValue.class).value();
+        if (name.isBlank()) {
+            name = qualified;
+        }
+        if (!validRecordName(name)) {
+            diagnostics.error(quoted(name) + " is not a valid record name; it must be a dotted "
+                    + "name like fr.oreo.Tier. A slash would make it an event type, which is a "
+                    + "different vocabulary", type);
+            return;
+        }
+        List<Field> layout = layoutOf(type, diagnostics);
+        if (diagnostics.failed()) {
+            return;
+        }
+        if (layout.isEmpty()) {
+            diagnostics.error("an @EventValue class carrying nothing encodes to an empty list "
+                    + "and tells a subscriber nothing", type);
+            return;
+        }
+        if (!hasLayoutConstructor(type, layout)) {
+            diagnostics.error("an @EventValue class is built from the values that arrive, so it "
+                    + "needs `" + type.getSimpleName() + "(" + signature(layout) + ")` — every "
+                    + "field in declaration order", type);
+            return;
+        }
+        String previous = recordClasses.putIfAbsent(name, qualified);
+        if (previous != null && !previous.equals(qualified)) {
+            diagnostics.error(previous + " already declares the record " + name
+                    + "; two classes describing one record is the disagreement the manifest "
+                    + "exists to prevent", type);
+            return;
+        }
+        records.put(name, layout);
+        String generated = qualified + "Values";
+        try {
+            JavaFileObject file = processingEnv.getFiler().createSourceFile(generated, type);
+            try (Writer writer = file.openWriter()) {
+                writer.write(new RecordEmitter().render(qualified, layout));
+            }
+        } catch (IOException failure) {
+            diagnostics.error("could not write " + generated + ": " + failure.getMessage(), type);
+        }
+    }
+
+    /// Refuses a record that contains itself, directly or through another.
+    ///
+    /// The wire is a finite positional payload with no pointers, so that is not
+    /// a shape that could be encoded at all. The manifest refuses it too; saying
+    /// it here means the author sees it while compiling rather than at the far
+    /// end of a build.
+    private void detectCycles(Diagnostics diagnostics) {
+        for (String name : records.keySet()) {
+            List<String> path = new ArrayList<>();
+            if (reaches(name, name, path, new HashSet<>())) {
+                diagnostics.error("the record " + name + " contains itself, through "
+                        + String.join(" -> ", path) + " -> " + name, null);
+                return;
+            }
+        }
+    }
+
+    private boolean reaches(String from, String target, List<String> path, Set<String> seen) {
+        if (!seen.add(from)) {
+            return false;
+        }
+        for (Field field : records.getOrDefault(from, List.of())) {
+            Carried carried = field.carried() instanceof Carried.Listed listed
+                    ? listed.element()
+                    : field.carried();
+            if (!(carried instanceof Carried.Compound compound)) {
+                continue;
+            }
+            path.add(from);
+            if (compound.name().equals(target) || reaches(compound.name(), target, path, seen)) {
+                return true;
+            }
+            path.remove(path.size() - 1);
+        }
+        return false;
+    }
+
+    /// The same rule the manifest applies, so a name javac accepts is a name the
+    /// host accepts. Case is kept: a record is a type, and every language this
+    /// contract serves capitalises one.
+    private static boolean validRecordName(String name) {
+        if (name.isEmpty() || name.startsWith(".") || name.endsWith(".")
+                || name.contains("..") || name.indexOf('/') >= 0) {
+            return false;
+        }
+        if (Character.isDigit(name.charAt(0))) {
+            return false;
+        }
+        for (int index = 0; index < name.length(); index++) {
+            char character = name.charAt(index);
+            if (!Character.isLetterOrDigit(character) && character != '.' && character != '_') {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static String quoted(String value) {
+        return '"' + value + '"';
+    }
+
     /// Hands the layouts to gocraft-cli, which writes them into the manifest.
     ///
     /// Nothing is written when a plugin declares no events, so a build that has
     /// none leaves no artefact for the packer to wonder about.
     private void writeDump(Diagnostics diagnostics) {
-        if (declared.isEmpty()) {
+        if (declared.isEmpty() && records.isEmpty()) {
             return;
         }
         try {
             FileObject file = processingEnv.getFiler()
                     .createResource(StandardLocation.CLASS_OUTPUT, "", LayoutDump.PATH);
             try (Writer writer = file.openWriter()) {
-                writer.write(new LayoutDump().render(declared));
+                writer.write(new LayoutDump().render(declared, records));
             }
         } catch (IOException failure) {
             diagnostics.error("could not write " + LayoutDump.PATH + ": " + failure.getMessage(),
@@ -189,13 +346,14 @@ public final class EventProcessor extends AbstractProcessor {
     /// Works out how one field crosses the wire, or says why it cannot.
     private Field resolve(TypeElement owner, VariableElement field, Diagnostics diagnostics) {
         String name = field.getSimpleName().toString();
-        Kind kind = Kind.of(field.asType().toString());
-        if (kind == null) {
+        Carried carried = carriedBy(field.asType().toString());
+        if (carried == null) {
             diagnostics.error(name + " is a " + field.asType() + ", which an event cannot carry. "
-                    + "A plugin event holds primitives, String and byte[]. A boxed type is "
-                    + "refused because the wire has no null; something richer belongs behind "
-                    + "an id the subscriber can look up, since an event carrying a live object "
-                    + "is carrying implementation instead of a fact", field);
+                    + "It holds primitives, String, byte[], PlayerRef, a class marked "
+                    + "@EventValue, or a List of any of those. A boxed type is refused because "
+                    + "the wire has no null; something richer belongs behind an id the "
+                    + "subscriber can look up, since carrying a live object is carrying "
+                    + "implementation instead of a fact", field);
             return null;
         }
         if (accessor(owner, name) == null) {
@@ -212,7 +370,7 @@ public final class EventProcessor extends AbstractProcessor {
                     + "the field final to declare it read-only, or add the setter", field);
             return null;
         }
-        return new Field(name, kind, mutable, setter, field.asType().toString());
+        return new Field(name, carried, mutable, setter, field.asType().toString());
     }
 
     private ExecutableElement accessor(TypeElement owner, String name) {
@@ -288,7 +446,47 @@ public final class EventProcessor extends AbstractProcessor {
     /// `declared` is the Java type as written. Reading widens on its own — an
     /// int fits a long — but writing back has to narrow explicitly, so the
     /// codec needs to know what it is narrowing to.
-    record Field(String name, Kind kind, boolean mutable, String setter, String declared) {
+    record Field(String name, Carried carried, boolean mutable, String setter, String declared) {
+    }
+
+    /// The one place a Java type becomes something the wire carries.
+    ///
+    /// Null for anything else, which the caller turns into a message naming the
+    /// whole vocabulary — a list of what is allowed beats "unsupported type",
+    /// which leaves an author guessing whether their own class could be made to
+    /// work.
+    private Carried carriedBy(String declared) {
+        // One level of list. A list of lists has no author asking for it, and
+        // the manifest refuses one for the same reason: it would mean deciding
+        // how deep a mutation path may reach before anybody has written one.
+        if (declared.startsWith(LIST_PREFIX) && declared.endsWith(">")) {
+            String element = declared.substring(LIST_PREFIX.length(), declared.length() - 1);
+            Carried inside = simpleCarriedBy(element);
+            return inside == null ? null : new Carried.Listed(inside, declared);
+        }
+        return simpleCarriedBy(declared);
+    }
+
+    private static final String LIST_PREFIX = "java.util.List<";
+
+    private Carried simpleCarriedBy(String declared) {
+        Kind kind = Kind.of(declared);
+        if (kind != null) {
+            return new Carried.Scalar(kind, declared);
+        }
+        if (declared.equals("fr.gocraft.api.PlayerRef")) {
+            return new Carried.Player();
+        }
+        TypeElement type = processingEnv.getElementUtils().getTypeElement(declared);
+        if (type == null) {
+            return null;
+        }
+        EventValue value = type.getAnnotation(EventValue.class);
+        if (value == null) {
+            return null;
+        }
+        String name = value.value().isBlank() ? declared : value.value();
+        return new Carried.Compound(name, declared, declared + "Values");
     }
 
     /// The scalars an event can carry, and how each is spelled as a [Value].

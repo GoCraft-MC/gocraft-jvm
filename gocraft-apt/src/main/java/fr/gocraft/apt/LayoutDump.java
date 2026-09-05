@@ -32,13 +32,23 @@ final class LayoutDump {
     record Declared(PluginEvent annotation, List<EventProcessor.Field> layout) {
     }
 
-    String render(List<Declared> events) {
+    String render(List<Declared> events, java.util.Map<String, List<EventProcessor.Field>> records) {
         out.append("{\n");
         out.append("  \"version\": ").append(VERSION).append(",\n");
-        // Empty today. The records a field may hold are declared here once the
-        // processor descends into them; gocraft-cli already reads the key, so
-        // adding them later is not a change of format.
-        out.append("  \"types\": [],\n");
+        out.append("  \"types\": [\n");
+        int remaining = records.size();
+        for (java.util.Map.Entry<String, List<EventProcessor.Field>> record : records.entrySet()) {
+            out.append("    {\n");
+            out.append("      \"name\": ").append(quote(record.getKey())).append(",\n");
+            out.append("      \"fields\": [\n");
+            List<EventProcessor.Field> layout = record.getValue();
+            for (int index = 0; index < layout.size(); index++) {
+                field(layout.get(index), index + 1 == layout.size());
+            }
+            out.append("      ]\n");
+            out.append("    }").append(--remaining == 0 ? "\n" : ",\n");
+        }
+        out.append("  ],\n");
         out.append("  \"events\": [\n");
         for (int index = 0; index < events.size(); index++) {
             event(events.get(index), index + 1 == events.size());
@@ -64,7 +74,7 @@ final class LayoutDump {
 
     private void field(EventProcessor.Field field, boolean last) {
         out.append("        { \"name\": ").append(quote(field.name()))
-                .append(", \"type\": ").append(quote(field.kind().manifest))
+                .append(", \"type\": ").append(quote(field.carried().manifest()))
                 .append(", \"mutable\": ").append(field.mutable())
                 .append(" }").append(last ? "\n" : ",\n");
     }
