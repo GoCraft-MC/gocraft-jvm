@@ -88,6 +88,46 @@ public interface Host {
     /// host has already told every client the command exists.
     void registerCommands(fr.gocraft.api.command.CommandSet commands);
 
+    /// Publishes a plugin-defined event and waits for its subscribers.
+    ///
+    ///     PurchaseEvent purchase = new PurchaseEvent(player, tiers, 1500);
+    ///     if (host.emit(purchase)) {
+    ///         charge(player, purchase.price());   // the discounted one
+    ///     }
+    ///
+    /// False means a subscriber cancelled it, or that a fail-closed event lost
+    /// one. Abandon whatever it was about to do: the host applied nothing on
+    /// the plugin's behalf.
+    ///
+    /// The event object is updated before this returns, so the price a
+    /// discount plugin set is read from the field that was published — across
+    /// a process boundary and two languages, with the same feel as an
+    /// in-process listener.
+    ///
+    /// The host does the dispatching, not this runtime. Subscribers span
+    /// runtimes, they run in priority order, and cancellation has to be
+    /// arbitrated by something that is not one of them. The plugin's own
+    /// handlers are skipped: it is the author of that state, not an observer.
+    ///
+    /// It blocks the calling thread. Called from a handler, it therefore
+    /// spends the event budget the host is already holding the tick on — so
+    /// emit from a command or a scheduled task rather than from inside a
+    /// cancellable event, unless the event is what the plugin exists to
+    /// publish.
+    ///
+    /// @throws IllegalArgumentException if `plugin.toml` never declared this
+    ///         event under `[[events.provides]]`, so the host assigned it no
+    ///         id and nothing would receive it.
+    /// @throws IllegalStateException if the host refused the emission or the
+    ///         connection went away while it was in flight.
+    /// Takes an Object rather than one interface because the two ways of
+    /// declaring an event cannot share one: a @PluginEvent class implements
+    /// nothing — that is the point of it — and an annotation processor cannot
+    /// add an interface to a class someone else wrote. What is lost is a
+    /// compile error for passing the wrong thing; what is refused at runtime
+    /// names both routes rather than saying "not an event".
+    boolean emit(Object event);
+
     /// Writes a line to the server console.
     ///
     /// The runtime's output is routed to the server's own, so this lands in the
