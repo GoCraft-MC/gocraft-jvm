@@ -105,9 +105,11 @@ final class EventCodec {
     /// primitives, String and byte[], so a change is always a whole field. When
     /// nested values arrive the paths will need to go deeper, and this is where.
     ///
-    /// A byte[] is compared by content. Value.Bytes is a record, so its equals
-    /// is the array's — identity — and a getter that hands back a defensive copy
-    /// would otherwise report a change on every dispatch.
+    /// A byte[] is compared by content, at any depth. Value.Bytes is a record,
+    /// so its equals is the array's — identity — and that reaches further than
+    /// it looks: a PlayerRef travels as a list whose first element is one, so a
+    /// field nobody touched was reported as changed on every single dispatch,
+    /// and the host logged a write to a read-only field for it.
     static List<Mutation> changes(List<fr.gocraft.api.Value> before,
             List<fr.gocraft.api.Value> after) {
         List<Mutation> mutations = new ArrayList<>();
@@ -128,6 +130,20 @@ final class EventCodec {
         if (before instanceof fr.gocraft.api.Value.Bytes(byte[] left)
                 && after instanceof fr.gocraft.api.Value.Bytes(byte[] right)) {
             return java.util.Arrays.equals(left, right);
+        }
+        // Recursive, because a record and a PlayerRef both travel as lists and
+        // either may hold bytes somewhere inside.
+        if (before instanceof fr.gocraft.api.Value.List(List<fr.gocraft.api.Value> left)
+                && after instanceof fr.gocraft.api.Value.List(List<fr.gocraft.api.Value> right)) {
+            if (left.size() != right.size()) {
+                return false;
+            }
+            for (int index = 0; index < left.size(); index++) {
+                if (!same(left.get(index), right.get(index))) {
+                    return false;
+                }
+            }
+            return true;
         }
         return before.equals(after);
     }
