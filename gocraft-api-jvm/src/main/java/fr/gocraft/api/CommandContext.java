@@ -20,7 +20,7 @@ import java.util.Map;
 ///
 /// One context is handed to one handler and is not thread-safe. Do not keep it:
 /// the values are a snapshot taken when the line was typed.
-public final class CommandContext {
+public final class CommandContext implements EffectSink {
 
     /// One side effect a handler asked for, carried back with the answer.
     public record Effect(String call, List<Value> values) {
@@ -62,7 +62,11 @@ public final class CommandContext {
     }
 
     public CommandContext(CommandSender sender, Map<String, Argument> arguments) {
-        this.sender = sender;
+        // The sender was decoded before this existed, so its handle is bound
+        // here: sender().player().sendMessage(…) then reaches the same queue
+        // reply() does, instead of throwing on a handle that belongs to nothing.
+        this.sender = new CommandSender(sender.name(), sender.player().boundTo(this),
+                sender.permissions());
         this.arguments = new LinkedHashMap<>(arguments);
     }
 
@@ -111,7 +115,11 @@ public final class CommandContext {
 
     public PlayerRef player(String name) {
         Argument argument = typed(name, Argument.Type.PLAYER);
-        return argument == null ? PlayerRef.NONE : PlayerRef.of(argument.value());
+        // Bound to this invocation, so a command that names a player can tell
+        // them something: call.player("target").sendMessage(…) reaches the same
+        // queue reply() does. Without it the method would compile here and
+        // throw at runtime, which is the trap this API exists to remove.
+        return argument == null ? PlayerRef.NONE : PlayerRef.of(argument.value(), this);
     }
 
     public BlockPos position(String name) {
@@ -172,6 +180,16 @@ public final class CommandContext {
     /// failing the command.
     public void effect(String call, Value... values) {
         effects.add(new Effect(call, List.of(values)));
+    }
+
+    /// The same queue, reached the way a handle reaches it.
+    ///
+    /// A command's sender and its player arguments are handles like an event's,
+    /// so the verbs on them have to land somewhere — here, beside the replies,
+    /// in the order they were asked for.
+    @Override
+    public void add(String call, List<Value> values) {
+        effects.add(new Effect(call, values));
     }
 
     /// The PlayerRef shape the host reads back: uuid, username, edition. It has

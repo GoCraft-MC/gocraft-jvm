@@ -5,7 +5,6 @@ import fr.gocraft.abi.v1.Mutation;
 import fr.gocraft.abi.v1.Value;
 import fr.gocraft.abi.v1.ValueList;
 import fr.gocraft.abi.v1.Verdict;
-import fr.gocraft.api.Event;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -47,18 +46,20 @@ final class EventCodec {
         };
     }
 
-    /// Builds the answer: what the handlers decided, and everything they asked
-    /// for, in one message.
+    /// Everything a dispatch decided, from the one place it accumulated.
     ///
-    /// Effects are batched rather than sent as they happen, which is what keeps
-    /// one event to one round trip however much a handler does.
+    /// Effects are batched rather than sent as they happen, which keeps one
+    /// event to one round trip however much a handler does.
     ///
-    /// Cancellation comes from the control rather than the event: it is what a
-    /// handler was given to refuse with, and a native event no longer carries
-    /// the flag.
-    static Verdict verdict(Event event, boolean cancelled) {
-        Verdict.Builder verdict = Verdict.newBuilder().setCancelled(cancelled);
-        for (Event.Effect effect : event.effects()) {
+    /// The control is both the verdict channel and the sink every handle in the
+    /// payload was bound to, so there is nothing to merge: a message asked of a
+    /// player and a cancellation asked of the control arrive here together, in
+    /// the order the handlers asked for them.
+    static Verdict verdict(Control control, List<Mutation> mutations) {
+        Verdict.Builder verdict = Verdict.newBuilder()
+                .setCancelled(control.cancelled())
+                .addAllMutations(mutations);
+        for (Control.Effect effect : control.seal()) {
             verdict.addEffects(HostCall.newBuilder()
                     .setType(effect.call())
                     .addAllFields(wire(effect.values()))

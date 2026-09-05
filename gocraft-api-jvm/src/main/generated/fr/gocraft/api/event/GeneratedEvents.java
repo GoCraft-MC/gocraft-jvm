@@ -3,12 +3,13 @@
 // Source: abi/v1/events.proto
 package fr.gocraft.api.event;
 
+import fr.gocraft.api.EffectSink;
 import fr.gocraft.api.Event;
 import fr.gocraft.api.Value;
 
 import java.util.List;
 import java.util.Map;
-import java.util.function.Function;
+import java.util.function.BiFunction;
 
 /// Every native event, by type and by class.
 ///
@@ -21,7 +22,7 @@ public final class GeneratedEvents {
     private GeneratedEvents() {
     }
 
-    private static final Map<String, Function<List<Value>, Event>> BY_TYPE =
+    private static final Map<String, BiFunction<List<Value>, EffectSink, Event>> BY_TYPE =
             Map.ofEntries(
                     Map.entry(BlockBreakEvent.TYPE, BlockBreakEvent::new),
                     Map.entry(PlayerJoinEvent.TYPE, PlayerJoinEvent::new)
@@ -34,9 +35,13 @@ public final class GeneratedEvents {
 
     /// Builds the event a dispatch names, or null if this runtime was built
     /// against an ABI that does not have it.
-    public static Event create(String type, List<Value> fields) {
-        Function<List<Value>, Event> factory = BY_TYPE.get(type);
-        return factory == null ? null : factory.apply(fields);
+    ///
+    /// The sink comes in with the payload because decoding is what binds the
+    /// handles inside it: a PlayerRef a handler receives can already be acted
+    /// on, rather than being an identity it has to hand to a channel.
+    public static Event create(String type, List<Value> fields, EffectSink sink) {
+        BiFunction<List<Value>, EffectSink, Event> factory = BY_TYPE.get(type);
+        return factory == null ? null : factory.apply(fields, sink);
     }
 
     /// The type a handler subscribed to, from the class it declared.

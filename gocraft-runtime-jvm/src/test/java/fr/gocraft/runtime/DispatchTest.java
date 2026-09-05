@@ -122,7 +122,7 @@ class DispatchTest {
                             System.setProperty("%s.undeclared", String.valueOf(e.can("nobody.asked")));
                             if (!e.can("spawn.bypass")) {
                                 control.cancel();
-                                e.sendMessage("Protected area.");
+                                e.player().sendMessage("Protected area.");
                             }
                         }
                     }
@@ -208,8 +208,14 @@ class DispatchTest {
             // The recipient travels with the message. Without it the host has a
             // line and nobody to deliver it to, and would have to guess from
             // whatever event happened to be in flight.
-            assertTrue(effect.getFields(0).hasListValue(),
-                    "a message carries the PlayerRef it is addressed to");
+            //
+            // A bare uuid, and the same shape whatever the event: a handle is
+            // what sends, and the one it gets from a plugin-defined event has
+            // only an id to give — that event's author declared its layout, and
+            // a PlayerRef is not something they can declare. One shape beats a
+            // fuller one that only native events could produce.
+            assertEquals(16, effect.getFields(0).getBytesValue().size(),
+                    "a message names its recipient by uuid");
             assertEquals("Protected area.", effect.getFields(1).getStringValue());
         }
     }
@@ -356,6 +362,7 @@ class DispatchTest {
                         if (e.price() > 1000) {
                             control.cancel();
                         }
+                        control.player(new byte[16]).sendMessage("10% off applied.");
                     }
                 }
             }
@@ -415,6 +422,28 @@ class DispatchTest {
 
             assertEquals(0, reply.getVerdict().getMutationsCount(),
                     "an unchanged field was reported as a mutation: " + reply.getVerdict());
+        }
+    }
+
+    /// A subscriber answering the player its event is about.
+    ///
+    /// The gap this closes: the author's class is an ordinary one with nowhere
+    /// to record an effect, so until the control carried them a plugin could
+    /// receive an event and had no way to say anything about it. The recipient
+    /// is explicit because a plugin-defined event has no implicit actor.
+    @Test
+    void aSubscriberAnswersThroughTheControl(@TempDir Path directory) throws Exception {
+        try (PluginRegistry registry = shop(directory)) {
+            Envelope reply = purchase(registry, 100);
+
+            assertEquals(1, reply.getVerdict().getEffectsCount(),
+                    "the message did not travel in the verdict: " + reply.getVerdict());
+            var effect = reply.getVerdict().getEffects(0);
+            assertEquals("chat.message", effect.getType());
+            assertEquals(2, effect.getFieldsCount(), "a recipient and a message");
+            assertEquals(16, effect.getFields(0).getBytesValue().size(),
+                    "the recipient is a bare uuid, which is all this event could carry");
+            assertEquals("10% off applied.", effect.getFields(1).getStringValue());
         }
     }
 

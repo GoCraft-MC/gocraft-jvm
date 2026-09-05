@@ -1,6 +1,5 @@
 package fr.gocraft.api;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -29,23 +28,18 @@ public abstract class Event {
     private final String type;
     private final List<Value> fields;
     private final Map<String, Boolean> permissions;
-    private final List<Effect> effects = new ArrayList<>();
+    private final EffectSink sink;
 
-    protected Event(String type, List<Value> fields, Map<String, Boolean> permissions) {
+    protected Event(String type, List<Value> fields, Map<String, Boolean> permissions,
+            EffectSink sink) {
         this.type = type;
         this.fields = List.copyOf(fields);
         this.permissions = Map.copyOf(permissions);
+        this.sink = sink;
     }
 
     public final String type() {
         return type;
-    }
-
-    /// One side effect a handler asked for, carried back in the verdict.
-    public record Effect(String call, List<Value> values) {
-        public Effect {
-            values = List.copyOf(values);
-        }
     }
 
     // ── For generated subclasses ──────────────────────────────────────────────
@@ -85,18 +79,17 @@ public abstract class Event {
         return permissions.getOrDefault(node, false);
     }
 
-    /// Records a side effect. They accumulate and travel back together in the
-    /// verdict, which is what keeps one event to one round trip however much a
-    /// handler asks for.
-    protected final void effect(String call, Value... values) {
-        effects.add(new Effect(call, List.of(values)));
+    /// Where the handles in this payload send what they are asked to do.
+    ///
+    /// Protected and named rather than public: it is what a generated accessor
+    /// hands a [PlayerRef] as it decodes one, so the handle can act without
+    /// being given a channel. A plugin reaches effects through the noun they
+    /// happen to, never through this.
+    protected final EffectSink sink() {
+        return sink;
     }
 
     // ── For the runtime ───────────────────────────────────────────────────────
-
-    public final List<Effect> effects() {
-        return List.copyOf(effects);
-    }
 
     @Override
     public final String toString() {

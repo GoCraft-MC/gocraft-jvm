@@ -9,7 +9,7 @@ package fr.gocraft.api;
 ///     void onBlockBreak(BlockBreakEvent event, EventControl control) {
 ///         if ("minecraft:bedrock".equals(event.block().id())) {
 ///             control.cancel();
-///             event.sendMessage("Bedrock is not yours to break.");
+///             event.player().sendMessage("Bedrock is not yours to break.");
 ///         }
 ///     }
 ///
@@ -36,4 +36,24 @@ public interface EventControl {
 
     /// Whether this handler, or one that ran before it, has cancelled.
     boolean cancelled();
+
+    /// A handle for acting on somebody the event did not hand over.
+    ///
+    ///     @Subscribe
+    ///     void onPurchase(PurchaseEvent event, EventControl control) {
+    ///         control.player(event.buyer()).sendMessage("10% off applied.");
+    ///     }
+    ///
+    /// A native event carries a [PlayerRef] already bound to this dispatch, and
+    /// a handler uses that. A plugin-defined event carries whatever its author
+    /// declared — primitives, a string, a byte array — so the player it is
+    /// about arrives as a bare uuid and becomes actionable here.
+    ///
+    /// There is no `sendMessage` on this interface, deliberately. An effect
+    /// belongs to the thing it happens to, so the verb lives on the handle;
+    /// otherwise every verb added to the vocabulary would be another method
+    /// here, each taking the noun it acts on as an argument.
+    ///
+    /// @throws IllegalArgumentException if the uuid is not sixteen bytes
+    PlayerRef player(byte[] uuid);
 }

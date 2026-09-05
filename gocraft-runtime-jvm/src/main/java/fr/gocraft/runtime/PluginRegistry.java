@@ -125,12 +125,12 @@ final class PluginRegistry implements AutoCloseable {
         Subscriptions.ProblemReporter problems = (handler, thrown) ->
                 System.err.println("gocraft-runtime: " + pluginId + " handler " + handler
                         + " threw " + thrown);
-        Cancellation control = new Cancellation();
+        Control control = new Control();
 
-        Event event = GeneratedEvents.create(type, fields);
+        Event event = GeneratedEvents.create(type, fields, control);
         if (event != null) {
             loaded.subscriptions().dispatch(type, event, control, problems);
-            return Envelopes.verdict(seq, EventCodec.verdict(event, control.cancelled()));
+            return Envelopes.verdict(seq, EventCodec.verdict(control, List.of()));
         }
         return dispatchCustom(seq, pluginId, loaded, type, fields, control, problems);
     }
@@ -149,7 +149,7 @@ final class PluginRegistry implements AutoCloseable {
     /// decision — a subscriber to a plugin-defined event cannot yet message a
     /// player.
     private Envelope dispatchCustom(long seq, String pluginId, LoadedPlugin loaded, String type,
-            List<fr.gocraft.api.Value> fields, Cancellation control,
+            List<fr.gocraft.api.Value> fields, Control control,
             Subscriptions.ProblemReporter problems) {
         CustomEvent codec = loaded.subscriptions().codecFor(type);
         if (codec == null) {
@@ -173,10 +173,8 @@ final class PluginRegistry implements AutoCloseable {
             return allow(seq);
         }
         loaded.subscriptions().dispatch(type, event, control, problems);
-        return Envelopes.verdict(seq, Verdict.newBuilder()
-                .setCancelled(control.cancelled())
-                .addAllMutations(EventCodec.changes(fields, codec.fields(event)))
-                .build());
+        return Envelopes.verdict(seq, EventCodec.verdict(control,
+                EventCodec.changes(fields, codec.fields(event))));
     }
 
     /// Runs one command in one plugin and answers.

@@ -6,7 +6,6 @@ package fr.gocraft.api.event;
 import fr.gocraft.api.Block;
 import fr.gocraft.api.BlockPos;
 import fr.gocraft.api.PlayerRef;
-import fr.gocraft.api.Values;
 
 /// The {@code block.break} event.
 ///
@@ -19,13 +18,13 @@ public final class BlockBreakEvent extends fr.gocraft.api.Event {
 
     public static final String TYPE = "block.break";
 
-    public BlockBreakEvent(java.util.List<fr.gocraft.api.Value> fields) {
-        super(TYPE, fields, fr.gocraft.api.Events.permissions(fields, 4));
+    public BlockBreakEvent(java.util.List<fr.gocraft.api.Value> fields, fr.gocraft.api.EffectSink sink) {
+        super(TYPE, fields, fr.gocraft.api.Events.permissions(fields, 4), sink);
     }
 
     /// The {@code player} the event carries.
     public PlayerRef player() {
-        return PlayerRef.of(field(0));
+        return PlayerRef.of(field(0), sink());
     }
 
     /// The {@code pos} the event carries.
@@ -55,10 +54,4 @@ public final class BlockBreakEvent extends fr.gocraft.api.Event {
         return permission(node);
     }
 
-    /// Requests a side effect, batched into this event's verdict rather than
-    /// sent on its own — which is what keeps one event to one round trip
-    /// however much a handler asks for.
-    public void sendMessage(String message) {
-        effect("chat.message", field(0), Values.text(message));
-    }
 }
