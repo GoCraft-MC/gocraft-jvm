@@ -43,6 +43,8 @@ public  final class Envelope extends
     SHUTDOWN(13),
     INVOKE(14),
     INVOKED(15),
+    EMIT(16),
+    EMITTED(17),
     BODY_NOT_SET(0);
     private final int value;
     private BodyCase(int value) {
@@ -72,6 +74,8 @@ public  final class Envelope extends
         case 13: return SHUTDOWN;
         case 14: return INVOKE;
         case 15: return INVOKED;
+        case 16: return EMIT;
+        case 17: return EMITTED;
         case 0: return BODY_NOT_SET;
         default: return null;
       }
@@ -924,6 +928,156 @@ public  final class Envelope extends
    */
   private void clearInvoked() {
     if (bodyCase_ == 15) {
+      bodyCase_ = 0;
+      body_ = null;
+    }
+  }
+
+  public static final int EMIT_FIELD_NUMBER = 16;
+  /**
+   * <pre>
+   * A plugin-defined event, published by a plugin. The only exchange the
+   * runtime starts: everything above answers something the host asked for.
+   *
+   * Sequence numbers are therefore split rather than shared. The host numbers
+   * its requests odd and a runtime numbers its own even, so the two counters
+   * cannot produce the same number and hand one side's request to a caller
+   * waiting for the other's reply.
+   * </pre>
+   *
+   * <code>.gocraft.abi.v1.Emit emit = 16 [json_name = "emit"];</code>
+   */
+  @java.lang.Override
+  public boolean hasEmit() {
+    return bodyCase_ == 16;
+  }
+  /**
+   * <pre>
+   * A plugin-defined event, published by a plugin. The only exchange the
+   * runtime starts: everything above answers something the host asked for.
+   *
+   * Sequence numbers are therefore split rather than shared. The host numbers
+   * its requests odd and a runtime numbers its own even, so the two counters
+   * cannot produce the same number and hand one side's request to a caller
+   * waiting for the other's reply.
+   * </pre>
+   *
+   * <code>.gocraft.abi.v1.Emit emit = 16 [json_name = "emit"];</code>
+   */
+  @java.lang.Override
+  public fr.gocraft.abi.v1.Emit getEmit() {
+    if (bodyCase_ == 16) {
+       return (fr.gocraft.abi.v1.Emit) body_;
+    }
+    return fr.gocraft.abi.v1.Emit.getDefaultInstance();
+  }
+  /**
+   * <pre>
+   * A plugin-defined event, published by a plugin. The only exchange the
+   * runtime starts: everything above answers something the host asked for.
+   *
+   * Sequence numbers are therefore split rather than shared. The host numbers
+   * its requests odd and a runtime numbers its own even, so the two counters
+   * cannot produce the same number and hand one side's request to a caller
+   * waiting for the other's reply.
+   * </pre>
+   *
+   * <code>.gocraft.abi.v1.Emit emit = 16 [json_name = "emit"];</code>
+   */
+  private void setEmit(fr.gocraft.abi.v1.Emit value) {
+    java.util.Objects.requireNonNull(value);
+    body_ = value;
+    bodyCase_ = 16;
+  }
+  /**
+   * <pre>
+   * A plugin-defined event, published by a plugin. The only exchange the
+   * runtime starts: everything above answers something the host asked for.
+   *
+   * Sequence numbers are therefore split rather than shared. The host numbers
+   * its requests odd and a runtime numbers its own even, so the two counters
+   * cannot produce the same number and hand one side's request to a caller
+   * waiting for the other's reply.
+   * </pre>
+   *
+   * <code>.gocraft.abi.v1.Emit emit = 16 [json_name = "emit"];</code>
+   */
+  private void mergeEmit(fr.gocraft.abi.v1.Emit value) {
+    java.util.Objects.requireNonNull(value);
+    if (bodyCase_ == 16 &&
+        body_ != fr.gocraft.abi.v1.Emit.getDefaultInstance()) {
+      body_ = fr.gocraft.abi.v1.Emit.newBuilder((fr.gocraft.abi.v1.Emit) body_)
+          .mergeFrom(value).buildPartial();
+    } else {
+      body_ = value;
+    }
+    bodyCase_ = 16;
+  }
+  /**
+   * <pre>
+   * A plugin-defined event, published by a plugin. The only exchange the
+   * runtime starts: everything above answers something the host asked for.
+   *
+   * Sequence numbers are therefore split rather than shared. The host numbers
+   * its requests odd and a runtime numbers its own even, so the two counters
+   * cannot produce the same number and hand one side's request to a caller
+   * waiting for the other's reply.
+   * </pre>
+   *
+   * <code>.gocraft.abi.v1.Emit emit = 16 [json_name = "emit"];</code>
+   */
+  private void clearEmit() {
+    if (bodyCase_ == 16) {
+      bodyCase_ = 0;
+      body_ = null;
+    }
+  }
+
+  public static final int EMITTED_FIELD_NUMBER = 17;
+  /**
+   * <code>.gocraft.abi.v1.Emitted emitted = 17 [json_name = "emitted"];</code>
+   */
+  @java.lang.Override
+  public boolean hasEmitted() {
+    return bodyCase_ == 17;
+  }
+  /**
+   * <code>.gocraft.abi.v1.Emitted emitted = 17 [json_name = "emitted"];</code>
+   */
+  @java.lang.Override
+  public fr.gocraft.abi.v1.Emitted getEmitted() {
+    if (bodyCase_ == 17) {
+       return (fr.gocraft.abi.v1.Emitted) body_;
+    }
+    return fr.gocraft.abi.v1.Emitted.getDefaultInstance();
+  }
+  /**
+   * <code>.gocraft.abi.v1.Emitted emitted = 17 [json_name = "emitted"];</code>
+   */
+  private void setEmitted(fr.gocraft.abi.v1.Emitted value) {
+    java.util.Objects.requireNonNull(value);
+    body_ = value;
+    bodyCase_ = 17;
+  }
+  /**
+   * <code>.gocraft.abi.v1.Emitted emitted = 17 [json_name = "emitted"];</code>
+   */
+  private void mergeEmitted(fr.gocraft.abi.v1.Emitted value) {
+    java.util.Objects.requireNonNull(value);
+    if (bodyCase_ == 17 &&
+        body_ != fr.gocraft.abi.v1.Emitted.getDefaultInstance()) {
+      body_ = fr.gocraft.abi.v1.Emitted.newBuilder((fr.gocraft.abi.v1.Emitted) body_)
+          .mergeFrom(value).buildPartial();
+    } else {
+      body_ = value;
+    }
+    bodyCase_ = 17;
+  }
+  /**
+   * <code>.gocraft.abi.v1.Emitted emitted = 17 [json_name = "emitted"];</code>
+   */
+  private void clearEmitted() {
+    if (bodyCase_ == 17) {
       bodyCase_ = 0;
       body_ = null;
     }
@@ -1879,6 +2033,162 @@ public  final class Envelope extends
       return this;
     }
 
+    /**
+     * <pre>
+     * A plugin-defined event, published by a plugin. The only exchange the
+     * runtime starts: everything above answers something the host asked for.
+     *
+     * Sequence numbers are therefore split rather than shared. The host numbers
+     * its requests odd and a runtime numbers its own even, so the two counters
+     * cannot produce the same number and hand one side's request to a caller
+     * waiting for the other's reply.
+     * </pre>
+     *
+     * <code>.gocraft.abi.v1.Emit emit = 16 [json_name = "emit"];</code>
+     */
+    @java.lang.Override
+    public boolean hasEmit() {
+      return instance.hasEmit();
+    }
+    /**
+     * <pre>
+     * A plugin-defined event, published by a plugin. The only exchange the
+     * runtime starts: everything above answers something the host asked for.
+     *
+     * Sequence numbers are therefore split rather than shared. The host numbers
+     * its requests odd and a runtime numbers its own even, so the two counters
+     * cannot produce the same number and hand one side's request to a caller
+     * waiting for the other's reply.
+     * </pre>
+     *
+     * <code>.gocraft.abi.v1.Emit emit = 16 [json_name = "emit"];</code>
+     */
+    @java.lang.Override
+    public fr.gocraft.abi.v1.Emit getEmit() {
+      return instance.getEmit();
+    }
+    /**
+     * <pre>
+     * A plugin-defined event, published by a plugin. The only exchange the
+     * runtime starts: everything above answers something the host asked for.
+     *
+     * Sequence numbers are therefore split rather than shared. The host numbers
+     * its requests odd and a runtime numbers its own even, so the two counters
+     * cannot produce the same number and hand one side's request to a caller
+     * waiting for the other's reply.
+     * </pre>
+     *
+     * <code>.gocraft.abi.v1.Emit emit = 16 [json_name = "emit"];</code>
+     */
+    public Builder setEmit(fr.gocraft.abi.v1.Emit value) {
+      copyOnWrite();
+      instance.setEmit(value);
+      return this;
+    }
+    /**
+     * <pre>
+     * A plugin-defined event, published by a plugin. The only exchange the
+     * runtime starts: everything above answers something the host asked for.
+     *
+     * Sequence numbers are therefore split rather than shared. The host numbers
+     * its requests odd and a runtime numbers its own even, so the two counters
+     * cannot produce the same number and hand one side's request to a caller
+     * waiting for the other's reply.
+     * </pre>
+     *
+     * <code>.gocraft.abi.v1.Emit emit = 16 [json_name = "emit"];</code>
+     */
+    public Builder setEmit(
+        fr.gocraft.abi.v1.Emit.Builder builderForValue) {
+      copyOnWrite();
+      instance.setEmit(builderForValue.build());
+      return this;
+    }
+    /**
+     * <pre>
+     * A plugin-defined event, published by a plugin. The only exchange the
+     * runtime starts: everything above answers something the host asked for.
+     *
+     * Sequence numbers are therefore split rather than shared. The host numbers
+     * its requests odd and a runtime numbers its own even, so the two counters
+     * cannot produce the same number and hand one side's request to a caller
+     * waiting for the other's reply.
+     * </pre>
+     *
+     * <code>.gocraft.abi.v1.Emit emit = 16 [json_name = "emit"];</code>
+     */
+    public Builder mergeEmit(fr.gocraft.abi.v1.Emit value) {
+      copyOnWrite();
+      instance.mergeEmit(value);
+      return this;
+    }
+    /**
+     * <pre>
+     * A plugin-defined event, published by a plugin. The only exchange the
+     * runtime starts: everything above answers something the host asked for.
+     *
+     * Sequence numbers are therefore split rather than shared. The host numbers
+     * its requests odd and a runtime numbers its own even, so the two counters
+     * cannot produce the same number and hand one side's request to a caller
+     * waiting for the other's reply.
+     * </pre>
+     *
+     * <code>.gocraft.abi.v1.Emit emit = 16 [json_name = "emit"];</code>
+     */
+    public Builder clearEmit() {
+      copyOnWrite();
+      instance.clearEmit();
+      return this;
+    }
+
+    /**
+     * <code>.gocraft.abi.v1.Emitted emitted = 17 [json_name = "emitted"];</code>
+     */
+    @java.lang.Override
+    public boolean hasEmitted() {
+      return instance.hasEmitted();
+    }
+    /**
+     * <code>.gocraft.abi.v1.Emitted emitted = 17 [json_name = "emitted"];</code>
+     */
+    @java.lang.Override
+    public fr.gocraft.abi.v1.Emitted getEmitted() {
+      return instance.getEmitted();
+    }
+    /**
+     * <code>.gocraft.abi.v1.Emitted emitted = 17 [json_name = "emitted"];</code>
+     */
+    public Builder setEmitted(fr.gocraft.abi.v1.Emitted value) {
+      copyOnWrite();
+      instance.setEmitted(value);
+      return this;
+    }
+    /**
+     * <code>.gocraft.abi.v1.Emitted emitted = 17 [json_name = "emitted"];</code>
+     */
+    public Builder setEmitted(
+        fr.gocraft.abi.v1.Emitted.Builder builderForValue) {
+      copyOnWrite();
+      instance.setEmitted(builderForValue.build());
+      return this;
+    }
+    /**
+     * <code>.gocraft.abi.v1.Emitted emitted = 17 [json_name = "emitted"];</code>
+     */
+    public Builder mergeEmitted(fr.gocraft.abi.v1.Emitted value) {
+      copyOnWrite();
+      instance.mergeEmitted(value);
+      return this;
+    }
+    /**
+     * <code>.gocraft.abi.v1.Emitted emitted = 17 [json_name = "emitted"];</code>
+     */
+    public Builder clearEmitted() {
+      copyOnWrite();
+      instance.clearEmitted();
+      return this;
+    }
+
     // @@protoc_insertion_point(builder_scope:gocraft.abi.v1.Envelope)
   }
   @java.lang.Override
@@ -1912,11 +2222,14 @@ public  final class Envelope extends
             fr.gocraft.abi.v1.Shutdown.class,
             fr.gocraft.abi.v1.Invoke.class,
             fr.gocraft.abi.v1.Invoked.class,
+            fr.gocraft.abi.v1.Emit.class,
+            fr.gocraft.abi.v1.Emitted.class,
           };
           java.lang.String info =
-              "\u0000\u000f\u0001\u0000\u0001\u000f\u000f\u0000\u0000\u0000\u0001\u0003\u0002<\u0000" +
+              "\u0000\u0011\u0001\u0000\u0001\u0011\u0011\u0000\u0000\u0000\u0001\u0003\u0002<\u0000" +
               "\u0003<\u0000\u0004<\u0000\u0005<\u0000\u0006<\u0000\u0007<\u0000\b<\u0000\t<\u0000" +
-              "\n<\u0000\u000b<\u0000\f<\u0000\r<\u0000\u000e<\u0000\u000f<\u0000";
+              "\n<\u0000\u000b<\u0000\f<\u0000\r<\u0000\u000e<\u0000\u000f<\u0000\u0010<\u0000\u0011" +
+              "<\u0000";
           return newMessageInfo(DEFAULT_INSTANCE, info, objects);
       }
       case GET_DEFAULT_INSTANCE: {

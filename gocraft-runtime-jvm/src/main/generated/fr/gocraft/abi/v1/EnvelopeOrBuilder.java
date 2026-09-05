@@ -214,5 +214,47 @@ public interface EnvelopeOrBuilder extends
    */
   fr.gocraft.abi.v1.Invoked getInvoked();
 
+  /**
+   * <pre>
+   * A plugin-defined event, published by a plugin. The only exchange the
+   * runtime starts: everything above answers something the host asked for.
+   *
+   * Sequence numbers are therefore split rather than shared. The host numbers
+   * its requests odd and a runtime numbers its own even, so the two counters
+   * cannot produce the same number and hand one side's request to a caller
+   * waiting for the other's reply.
+   * </pre>
+   *
+   * <code>.gocraft.abi.v1.Emit emit = 16 [json_name = "emit"];</code>
+   * @return Whether the emit field is set.
+   */
+  boolean hasEmit();
+  /**
+   * <pre>
+   * A plugin-defined event, published by a plugin. The only exchange the
+   * runtime starts: everything above answers something the host asked for.
+   *
+   * Sequence numbers are therefore split rather than shared. The host numbers
+   * its requests odd and a runtime numbers its own even, so the two counters
+   * cannot produce the same number and hand one side's request to a caller
+   * waiting for the other's reply.
+   * </pre>
+   *
+   * <code>.gocraft.abi.v1.Emit emit = 16 [json_name = "emit"];</code>
+   * @return The emit.
+   */
+  fr.gocraft.abi.v1.Emit getEmit();
+
+  /**
+   * <code>.gocraft.abi.v1.Emitted emitted = 17 [json_name = "emitted"];</code>
+   * @return Whether the emitted field is set.
+   */
+  boolean hasEmitted();
+  /**
+   * <code>.gocraft.abi.v1.Emitted emitted = 17 [json_name = "emitted"];</code>
+   * @return The emitted.
+   */
+  fr.gocraft.abi.v1.Emitted getEmitted();
+
   public fr.gocraft.abi.v1.Envelope.BodyCase getBodyCase();
 }
