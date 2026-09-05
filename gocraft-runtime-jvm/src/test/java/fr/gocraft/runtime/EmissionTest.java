@@ -139,7 +139,7 @@ class EmissionTest {
         }
 
         @Override
-        public Object create(List<Value> fields) {
+        public Object create(List<Value> fields, fr.gocraft.api.EffectSink sink) {
             return new TestEvent();
         }
     }

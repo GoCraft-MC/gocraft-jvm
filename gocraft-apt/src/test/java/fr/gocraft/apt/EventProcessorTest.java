@@ -103,7 +103,7 @@ class EventProcessorTest {
     void buildsTheEventASubscriberReceives() throws IOException {
         String codec = Javac.compile("PurchaseEvent", PURCHASE, PROCESSOR)
                 .source("PurchaseEventLayout");
-        assertTrue(codec.contains("public Object create(List<Value> fields)"), codec);
+        assertTrue(codec.contains("public Object create(List<Value> fields, EffectSink sink)"), codec);
         assertTrue(codec.contains("new PurchaseEvent("), codec);
         assertTrue(codec.contains("(int) quantity"), "the constructor argument was not narrowed:\n" + codec);
     }

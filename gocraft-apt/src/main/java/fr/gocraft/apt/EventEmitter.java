@@ -29,6 +29,7 @@ final class EventEmitter {
             blank();
         }
         line(0, "import fr.gocraft.api.CustomEvent;");
+        line(0, "import fr.gocraft.api.EffectSink;");
         line(0, "import fr.gocraft.api.Value;");
         line(0, "import java.util.List;");
         blank();
@@ -102,7 +103,7 @@ final class EventEmitter {
         // layout, and constructing anyway would hand the handler a zero it
         // would read as a real price.
         line(1, "@Override");
-        line(1, "public Object create(List<Value> fields) {");
+        line(1, "public Object create(List<Value> fields, EffectSink sink) {");
         line(2, "if (fields.size() < " + layout.size() + ") {");
         line(3, "throw new IllegalArgumentException(\"" + declared.value() + " arrived with \""
                 + " + fields.size() + \" fields, its layout declares " + layout.size() + "\");");

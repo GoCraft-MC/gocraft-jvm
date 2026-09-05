@@ -288,6 +288,7 @@ class DispatchTest {
             package test.plugin;
 
             import fr.gocraft.api.CustomEvent;
+            import fr.gocraft.api.EffectSink;
             import fr.gocraft.api.EventControl;
             import fr.gocraft.api.Host;
             import fr.gocraft.api.Plugin;
@@ -343,7 +344,7 @@ class DispatchTest {
                     }
 
                     @Override
-                    public Object create(List<Value> fields) {
+                    public Object create(List<Value> fields, EffectSink sink) {
                         if (!(fields.get(0) instanceof Value.Text(String player))) {
                             throw new IllegalArgumentException("field 0 is not a text");
                         }

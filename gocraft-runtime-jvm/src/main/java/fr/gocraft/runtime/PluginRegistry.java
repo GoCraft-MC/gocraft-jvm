@@ -162,7 +162,7 @@ final class PluginRegistry implements AutoCloseable {
         }
         Object event;
         try {
-            event = codec.create(fields);
+            event = codec.create(fields, control);
         } catch (RuntimeException malformed) {
             // The provider and this subscriber disagree about the layout. Said
             // out loud and allowed, rather than cancelling on a decode failure:

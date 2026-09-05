@@ -82,5 +82,11 @@ public interface CustomEvent {
     /// build requires a constructor taking every field in declaration order,
     /// and a class that has none is a compile error rather than an event that
     /// cannot be delivered.
-    Object create(List<Value> fields);
+    ///
+    /// The sink is for the handles inside the payload. An event carrying a
+    /// [PlayerRef] hands its subscriber somebody it can answer, exactly as a
+    /// native event does — which is the whole reason PlayerRef is in the
+    /// vocabulary rather than being sixteen bytes the handler has to turn into
+    /// a handle itself.
+    Object create(List<Value> fields, EffectSink sink);
 }
