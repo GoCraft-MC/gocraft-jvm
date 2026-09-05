@@ -56,7 +56,16 @@ final class Warmup {
     ///
     /// Best effort throughout. A warm-up that failed has cost a load nothing,
     /// and reporting it would be reporting an optimisation.
+    private static final java.util.concurrent.atomic.AtomicBoolean DONE =
+            new java.util.concurrent.atomic.AtomicBoolean();
+
     static void run() {
+        // Once per process, not once per plugin. Everything below is static,
+        // shared machinery: a second plugin in the same runtime would pay for
+        // it again and warm nothing.
+        if (!DONE.compareAndSet(false, true)) {
+            return;
+        }
         try {
             Control control = new Control();
             List<fr.gocraft.abi.v1.Value> wire = EventCodec.wire(SHAPES);

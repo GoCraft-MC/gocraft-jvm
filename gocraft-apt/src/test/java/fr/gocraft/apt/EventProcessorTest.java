@@ -252,12 +252,15 @@ class EventProcessorTest {
 
     /// The point of PlayerRef being in the vocabulary: a subscriber is handed
     /// somebody it can answer, not sixteen bytes it must turn into a handle.
+    ///
+    /// The handle is also what knows its own wire shape — the codec asks it
+    /// rather than writing the list out, which three generators used to do.
     @Test
     void bindsAPlayerToTheDispatch() throws IOException {
         String codec = Javac.compile("PurchaseEvent", TIERED, PROCESSOR)
                 .source("PurchaseEventLayout");
         assertTrue(codec.contains("fr.gocraft.api.PlayerRef.of(fields.get(0), sink)"), codec);
-        assertTrue(codec.contains("playerValue(target.buyer())"), codec);
+        assertTrue(codec.contains("target.buyer().value()"), codec);
     }
 
     /// The wire is a finite positional payload with no pointers, so a record
