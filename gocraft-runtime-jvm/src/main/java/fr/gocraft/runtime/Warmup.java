@@ -2,6 +2,7 @@ package fr.gocraft.runtime;
 
 import fr.gocraft.api.Value;
 
+import java.lang.reflect.Method;
 import java.util.List;
 
 /// Runs the dispatch machinery once, at load, so the first real event does not
@@ -34,6 +35,11 @@ final class Warmup {
     private Warmup() {
     }
 
+    /// What the reflective warm-up calls. Doing nothing is the point: what is
+    /// being warmed is the path to it.
+    private static void nothing() {
+    }
+
     /// A payload with one of every shape, so no conversion meets its first
     /// value while the tick is waiting.
     private static final List<Value> SHAPES = List.of(
@@ -61,13 +67,32 @@ final class Warmup {
             control.player(new byte[16]).sendMessage("warm");
             EventCodec.verdict(control, List.of());
 
+            // A handle read the way a payload carries one, which is not the way
+            // the control builds one: PlayerRef.of parses the list shape, and
+            // every event carrying a player goes through it.
+            fr.gocraft.api.PlayerRef.of(new Value.List(List.of(
+                    new Value.Bytes(new byte[16]),
+                    new Value.Text("warm"),
+                    new Value.Text("java"))), control);
+
+            // The first reflective call is the expensive one: the JVM spins up
+            // the machinery behind Method.invoke once, and every handler is
+            // reached through it. Warmed on a method of this class, because
+            // calling a plugin's would mean running an author's code against
+            // values nobody sent.
+            Method noop = Warmup.class.getDeclaredMethod("nothing");
+            noop.setAccessible(true);
+            for (int round = 0; round < 8; round++) {
+                noop.invoke(null);
+            }
+
             // The first virtual thread costs more than the ones after it, and
             // every dispatch is given one.
             Thread thread = Thread.ofVirtual().start(() -> EventCodec.wire(SHAPES));
             thread.join();
         } catch (InterruptedException interrupted) {
             Thread.currentThread().interrupt();
-        } catch (RuntimeException ignored) {
+        } catch (ReflectiveOperationException | RuntimeException ignored) {
             // Nothing here is load-bearing.
         }
     }
