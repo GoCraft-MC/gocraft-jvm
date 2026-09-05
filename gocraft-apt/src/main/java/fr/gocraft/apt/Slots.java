@@ -18,6 +18,14 @@ final class Slots {
 
     static final String SENDER = "fr.gocraft.api.CommandSender";
 
+    /// The invocation itself, for a handler that answers.
+    ///
+    /// Without it an annotated command could read its arguments and had no way
+    /// to say anything back — and the builder facade, which does hand one over,
+    /// declares its tree at runtime where the bundle needs it at build time. A
+    /// command that replies had no facade at all.
+    static final String CONTEXT = "fr.gocraft.api.CommandContext";
+
     private final Types types;
 
     Slots(Types types) {

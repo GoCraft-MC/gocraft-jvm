@@ -150,12 +150,23 @@ public final class CommandProcessor extends AbstractProcessor {
         List<? extends VariableElement> parameters = method.getParameters();
         for (int index = 0; index < parameters.size(); index++) {
             VariableElement parameter = parameters.get(index);
-            if (processingEnv.getTypeUtils().erasure(parameter.asType()).toString().equals(Slots.SENDER)) {
+            String erased = processingEnv.getTypeUtils().erasure(parameter.asType()).toString();
+            if (erased.equals(Slots.SENDER)) {
                 if (index != 0) {
                     diagnostics.error("the sender comes first or not at all", parameter);
                     return;
                 }
                 call.add("context.sender()");
+                continue;
+            }
+            if (erased.equals(Slots.CONTEXT)) {
+                if (!declared.isEmpty()) {
+                    diagnostics.error("the context comes before the arguments, so a signature "
+                            + "reads as what the command is given and then what was typed",
+                            parameter);
+                    return;
+                }
+                call.add("context");
                 continue;
             }
             Slot slot = slots.of(parameter, diagnostics);
