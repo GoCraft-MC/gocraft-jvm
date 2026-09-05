@@ -96,6 +96,36 @@ class EventProcessorTest {
         assertTrue(codec.contains("setPrice(price)"), "a double needed no cast:\n" + codec);
     }
 
+    /// A subscriber holds its own class matching the provider's layout, and
+    /// there is no shared type to hand it, so the codec builds one from the
+    /// values that arrived.
+    @Test
+    void buildsTheEventASubscriberReceives() throws IOException {
+        String codec = Javac.compile("PurchaseEvent", PURCHASE, PROCESSOR)
+                .source("PurchaseEventLayout");
+        assertTrue(codec.contains("public Object create(List<Value> fields)"), codec);
+        assertTrue(codec.contains("new PurchaseEvent("), codec);
+        assertTrue(codec.contains("(int) quantity"), "the constructor argument was not narrowed:\n" + codec);
+    }
+
+    /// Checked for every event rather than only the ones somebody subscribes to
+    /// today: an event that gains a subscriber a year later should not fail
+    /// then.
+    @Test
+    void refusesAnEventItCannotRebuild() throws IOException {
+        Javac.Result result = Javac.compile("Unbuildable", """
+                import fr.gocraft.api.PluginEvent;
+
+                @PluginEvent("fr.oreo.shop/unbuildable")
+                public final class Unbuildable {
+                    private final String player;
+                    public Unbuildable() { this.player = ""; }
+                    public String player() { return player; }
+                }
+                """, PROCESSOR);
+        assertTrue(result.firstError().contains("declaration order"), result.firstError());
+    }
+
     @Test
     void refusesATypeThatWouldShadowANativeEvent() throws IOException {
         Javac.Result result = Javac.compile("BlockBreak", """

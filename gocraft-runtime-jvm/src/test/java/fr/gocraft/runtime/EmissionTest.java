@@ -107,19 +107,40 @@ class EmissionTest {
                 "the refusal did not name the manifest section: " + refused.getMessage());
     }
 
-    private static final class TestEvent implements fr.gocraft.api.CustomEvent {
+    /// The event, and beside it the codec gocraft-apt would have written for
+    /// it.
+    ///
+    /// Written by hand here because the processor runs in another module, and
+    /// nested on purpose: the runtime resolves a codec by appending "Layout" to
+    /// the event's binary name, so TestEvent nested here is answered by
+    /// TestEventLayout nested here. A test that could not stand in for the
+    /// generated class would only be testing itself.
+    static final class TestEvent {
+    }
+
+    static final class TestEventLayout implements fr.gocraft.api.CustomEvent {
         @Override
         public String eventType() {
             return "fr.oreo.shop/purchase";
         }
 
         @Override
-        public List<Value> fields() {
+        public boolean cancellable() {
+            return true;
+        }
+
+        @Override
+        public List<Value> fields(Object event) {
             return purchase();
         }
 
         @Override
-        public void setFields(List<Value> fields) {
+        public void setFields(Object event, List<Value> fields) {
+        }
+
+        @Override
+        public Object create(List<Value> fields) {
+            return new TestEvent();
         }
     }
 }
