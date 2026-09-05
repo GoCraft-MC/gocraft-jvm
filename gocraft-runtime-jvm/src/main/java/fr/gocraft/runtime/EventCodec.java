@@ -51,10 +51,13 @@ final class EventCodec {
     /// for, in one message.
     ///
     /// Effects are batched rather than sent as they happen, which is what keeps
-    /// one event to one round trip however much a handler does. Mutations are
-    /// not produced yet — nothing in the API offers them.
-    static Verdict verdict(Event event) {
-        Verdict.Builder verdict = Verdict.newBuilder().setCancelled(event.cancelled());
+    /// one event to one round trip however much a handler does.
+    ///
+    /// Cancellation comes from the control rather than the event: it is what a
+    /// handler was given to refuse with, and a native event no longer carries
+    /// the flag.
+    static Verdict verdict(Event event, boolean cancelled) {
+        Verdict.Builder verdict = Verdict.newBuilder().setCancelled(cancelled);
         for (Event.Effect effect : event.effects()) {
             verdict.addEffects(HostCall.newBuilder()
                     .setType(effect.call())
@@ -87,9 +90,44 @@ final class EventCodec {
         return builder.build();
     }
 
-    /// Mutations exist in the schema and nothing produces one yet. Kept named so
-    /// the day something does, it is obvious where it belongs.
-    static List<Mutation> mutations() {
-        return List.of();
+    /// What the handlers changed on a plugin-defined event, as a positional
+    /// diff.
+    ///
+    /// Compared rather than recorded, because on this side the handler holds
+    /// its own typed object and writes through its own setters: there is
+    /// nowhere to hook a recorder without making an author call one. The Go SDK
+    /// records instead, since a subscriber there works positionally already —
+    /// the wire carries the same mutations either way, and how they were
+    /// produced is each runtime's own business.
+    ///
+    /// One entry per top-level field, which is exact today: an event carries
+    /// primitives, String and byte[], so a change is always a whole field. When
+    /// nested values arrive the paths will need to go deeper, and this is where.
+    ///
+    /// A byte[] is compared by content. Value.Bytes is a record, so its equals
+    /// is the array's — identity — and a getter that hands back a defensive copy
+    /// would otherwise report a change on every dispatch.
+    static List<Mutation> changes(List<fr.gocraft.api.Value> before,
+            List<fr.gocraft.api.Value> after) {
+        List<Mutation> mutations = new ArrayList<>();
+        int shared = Math.min(before.size(), after.size());
+        for (int index = 0; index < shared; index++) {
+            if (same(before.get(index), after.get(index))) {
+                continue;
+            }
+            mutations.add(Mutation.newBuilder()
+                    .addPath(index)
+                    .setValue(wire(after.get(index)))
+                    .build());
+        }
+        return mutations;
+    }
+
+    private static boolean same(fr.gocraft.api.Value before, fr.gocraft.api.Value after) {
+        if (before instanceof fr.gocraft.api.Value.Bytes(byte[] left)
+                && after instanceof fr.gocraft.api.Value.Bytes(byte[] right)) {
+            return java.util.Arrays.equals(left, right);
+        }
+        return before.equals(after);
     }
 }

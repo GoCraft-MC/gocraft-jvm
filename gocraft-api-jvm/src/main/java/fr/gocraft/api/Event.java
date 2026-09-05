@@ -16,6 +16,11 @@ import java.util.Map;
 /// handler and should be quick; anything else belongs somewhere the server is
 /// not waiting.
 ///
+/// Refusing what an event announced is [EventControl], asked for as a second
+/// parameter, and not a method here. A plugin-defined event is a class its
+/// author wrote and nothing can add a method to it, so one mechanism serves
+/// both rather than two that differ by who wrote the event.
+///
 /// An instance is handed to one subscriber at a time and is not thread-safe. Do
 /// not keep it: the fields are a snapshot, and the server has moved on by the
 /// time the handler returns.
@@ -25,7 +30,6 @@ public abstract class Event {
     private final List<Value> fields;
     private final Map<String, Boolean> permissions;
     private final List<Effect> effects = new ArrayList<>();
-    private boolean cancelled;
 
     protected Event(String type, List<Value> fields, Map<String, Boolean> permissions) {
         this.type = type;
@@ -88,18 +92,7 @@ public abstract class Event {
         effects.add(new Effect(call, List.of(values)));
     }
 
-    /// Protected, so an observational event does not offer it. A generated
-    /// cancellable event overrides it as public; the tick never waits for the
-    /// others, so a cancel that silently did nothing would be worse than none.
-    protected void cancel() {
-        this.cancelled = true;
-    }
-
     // ── For the runtime ───────────────────────────────────────────────────────
-
-    public final boolean cancelled() {
-        return cancelled;
-    }
 
     public final List<Effect> effects() {
         return List.copyOf(effects);
@@ -107,6 +100,6 @@ public abstract class Event {
 
     @Override
     public final String toString() {
-        return getClass().getSimpleName() + "[" + type + ", cancelled=" + cancelled + "]";
+        return getClass().getSimpleName() + "[" + type + "]";
     }
 }

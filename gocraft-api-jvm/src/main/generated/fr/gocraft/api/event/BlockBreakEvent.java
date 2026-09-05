@@ -61,16 +61,4 @@ public final class BlockBreakEvent extends fr.gocraft.api.Event {
     public void sendMessage(String message) {
         effect("chat.message", field(0), Values.text(message));
     }
-
-    /// Prevents the action. The host decides the outcome once every subscriber
-    /// has answered or the budget has run out.
-    ///
-    /// This is where cancelling becomes public. Event.cancel() is protected, so
-    /// an observational event simply does not offer it — the tick never waits
-    /// for one, and a method that silently did nothing would be worse than its
-    /// absence.
-    @Override
-    public void cancel() {
-        super.cancel();
-    }
 }

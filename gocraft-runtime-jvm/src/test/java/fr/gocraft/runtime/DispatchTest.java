@@ -13,6 +13,7 @@ import org.junit.jupiter.api.io.TempDir;
 import java.nio.ByteBuffer;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -87,6 +88,7 @@ class DispatchTest {
         return """
                 package test.plugin;
 
+                import fr.gocraft.api.EventControl;
                 import fr.gocraft.api.Host;
                 import fr.gocraft.api.Plugin;
                 import fr.gocraft.api.Priority;
@@ -107,7 +109,7 @@ class DispatchTest {
 
                     public static final class Listener {
                         @Subscribe(priority = Priority.HIGH)
-                        public void onBlockBreak(BlockBreakEvent e) {
+                        public void onBlockBreak(BlockBreakEvent e, EventControl control) {
                             System.setProperty("%s.player", e.player().username());
                             System.setProperty("%s.edition", e.player().edition().name());
                             System.setProperty("%s.uuid", e.player().uuid().toString());
@@ -119,7 +121,7 @@ class DispatchTest {
                             System.setProperty("%s.notify", String.valueOf(e.can("spawn.notify")));
                             System.setProperty("%s.undeclared", String.valueOf(e.can("nobody.asked")));
                             if (!e.can("spawn.bypass")) {
-                                e.cancel();
+                                control.cancel();
                                 e.sendMessage("Protected area.");
                             }
                         }
@@ -263,6 +265,168 @@ class DispatchTest {
 
             assertTrue(reply.hasVerdict());
             assertFalse(reply.getVerdict().getCancelled());
+        }
+    }
+
+    // ── A plugin-defined event, received ──────────────────────────────────────
+
+    /// The event and its codec, written by hand because gocraft-apt runs in
+    /// another module. Nested so their binary names stay in step: the runtime
+    /// resolves a codec by appending "Layout" to the event's name, and
+    /// ShopPlugin$PurchaseEvent is answered by ShopPlugin$PurchaseEventLayout.
+    ///
+    /// The handler is what a subscriber to somebody else's event looks like. It
+    /// holds its own class matching the provider's layout — there is no shared
+    /// type to import — and writes through its own setter.
+    private static final String SHOP_SOURCE = """
+            package test.plugin;
+
+            import fr.gocraft.api.CustomEvent;
+            import fr.gocraft.api.EventControl;
+            import fr.gocraft.api.Host;
+            import fr.gocraft.api.Plugin;
+            import fr.gocraft.api.Subscribe;
+            import fr.gocraft.api.Value;
+            import java.util.List;
+
+            public final class ShopPlugin implements Plugin {
+                private final Host host;
+
+                public ShopPlugin(Host host) {
+                    this.host = host;
+                }
+
+                @Override
+                public void enable() {
+                    host.registerListener(new Listener());
+                }
+
+                public static final class PurchaseEvent {
+                    private final String player;
+                    private double price;
+
+                    public PurchaseEvent(String player, double price) {
+                        this.player = player;
+                        this.price = price;
+                    }
+
+                    public String player() { return player; }
+                    public double price() { return price; }
+                    public void setPrice(double price) { this.price = price; }
+                }
+
+                public static final class PurchaseEventLayout implements CustomEvent {
+                    @Override
+                    public String eventType() { return "fr.oreo.shop/purchase"; }
+
+                    @Override
+                    public boolean cancellable() { return true; }
+
+                    @Override
+                    public List<Value> fields(Object event) {
+                        PurchaseEvent target = (PurchaseEvent) event;
+                        return List.of(new Value.Text(target.player()),
+                                new Value.Decimal(target.price()));
+                    }
+
+                    @Override
+                    public void setFields(Object event, List<Value> fields) {
+                        if (fields.get(1) instanceof Value.Decimal(double price)) {
+                            ((PurchaseEvent) event).setPrice(price);
+                        }
+                    }
+
+                    @Override
+                    public Object create(List<Value> fields) {
+                        if (!(fields.get(0) instanceof Value.Text(String player))) {
+                            throw new IllegalArgumentException("field 0 is not a text");
+                        }
+                        if (!(fields.get(1) instanceof Value.Decimal(double price))) {
+                            throw new IllegalArgumentException("field 1 is not a decimal");
+                        }
+                        return new PurchaseEvent(player, price);
+                    }
+                }
+
+                public static final class Listener {
+                    @Subscribe
+                    public void onPurchase(PurchaseEvent e, EventControl control) {
+                        System.setProperty("gc.shop.player", e.player());
+                        e.setPrice(e.price() * 0.9);
+                        if (e.price() > 1000) {
+                            control.cancel();
+                        }
+                    }
+                }
+            }
+            """;
+
+    private PluginRegistry shop(Path directory) throws Exception {
+        Path bundle = TestBundles.bundle(directory, "ShopPlugin", SHOP_SOURCE);
+        PluginRegistry registry = new PluginRegistry(
+                Files.createDirectories(directory.resolve("work")));
+        Envelope reply = registry.load(1, Load.newBuilder()
+                .setPluginId("fr.oreo.discount")
+                .setBundlePath(bundle.toString())
+                .setEntry("test.plugin.ShopPlugin")
+                .build());
+        assertTrue(reply.hasLoaded(), () -> "load failed: " + reply.getFail().getReason());
+        return registry;
+    }
+
+    private static Envelope purchase(PluginRegistry registry, double price) {
+        return registry.dispatch(21, Dispatch.newBuilder()
+                .setPluginId("fr.oreo.discount")
+                .setEvent(Event.newBuilder()
+                        .setType("fr.oreo.shop/purchase")
+                        .addFields(Value.newBuilder().setStringValue("oreo"))
+                        .addFields(Value.newBuilder().setDoubleValue(price)))
+                .build());
+    }
+
+    /// The other half of §10, and the one nothing proved until now: an event
+    /// one plugin defined, decoded into the subscriber's own class, handled,
+    /// and its change reported back as a mutation.
+    @Test
+    void aSubscriberReceivesAPluginDefinedEvent(@TempDir Path directory) throws Exception {
+        try (PluginRegistry registry = shop(directory)) {
+            Envelope reply = purchase(registry, 100);
+
+            assertEquals("oreo", System.getProperty("gc.shop.player"),
+                    "the handler never saw the payload");
+            assertTrue(reply.hasVerdict());
+            assertFalse(reply.getVerdict().getCancelled());
+            assertEquals(1, reply.getVerdict().getMutationsCount(),
+                    "the discount did not come back: " + reply.getVerdict());
+            var mutation = reply.getVerdict().getMutations(0);
+            assertEquals(List.of(1), mutation.getPathList(),
+                    "a mutation on the wrong field is worse than none");
+            assertEquals(90d, mutation.getValue().getDoubleValue(), 0.0001);
+        }
+    }
+
+    /// A field nobody touched produces no mutation. The diff is what the host
+    /// replays into the emitter's object, so an entry for an unchanged field
+    /// would be work done on every subscriber for nothing.
+    @Test
+    void reportsNothingForAFieldNobodyChanged(@TempDir Path directory) throws Exception {
+        try (PluginRegistry registry = shop(directory)) {
+            Envelope reply = purchase(registry, 0);
+
+            assertEquals(0, reply.getVerdict().getMutationsCount(),
+                    "an unchanged field was reported as a mutation: " + reply.getVerdict());
+        }
+    }
+
+    /// Cancelling a plugin-defined event travels the same way a native one's
+    /// does. The host arbitrates; this only has to reach it.
+    @Test
+    void aSubscriberCancelsAPluginDefinedEvent(@TempDir Path directory) throws Exception {
+        try (PluginRegistry registry = shop(directory)) {
+            Envelope reply = purchase(registry, 5000);
+
+            assertTrue(reply.getVerdict().getCancelled(),
+                    "the handler cancelled and it did not stick");
         }
     }
 }

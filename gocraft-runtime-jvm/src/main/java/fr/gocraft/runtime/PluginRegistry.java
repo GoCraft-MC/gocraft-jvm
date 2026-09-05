@@ -8,6 +8,7 @@ import fr.gocraft.abi.v1.Unload;
 import fr.gocraft.abi.v1.Verdict;
 import fr.gocraft.api.CommandContext;
 import fr.gocraft.api.CommandHandler;
+import fr.gocraft.api.CustomEvent;
 import fr.gocraft.api.Event;
 import fr.gocraft.api.event.GeneratedEvents;
 
@@ -119,20 +120,63 @@ final class PluginRegistry implements AutoCloseable {
         if (loaded == null) {
             return allow(seq);
         }
+        String type = request.getEvent().getType();
         var fields = EventCodec.fields(request.getEvent().getFieldsList());
-        Event event = GeneratedEvents.create(request.getEvent().getType(), fields);
-        if (event == null) {
-            // An event this build does not know. Allowing is the only honest
-            // answer: refusing something we cannot inspect would prevent
-            // gameplay on the strength of a version mismatch.
-            System.err.println("gocraft-runtime: " + pluginId + " was sent "
-                    + request.getEvent().getType() + ", which this build does not know");
+        Subscriptions.ProblemReporter problems = (handler, thrown) ->
+                System.err.println("gocraft-runtime: " + pluginId + " handler " + handler
+                        + " threw " + thrown);
+        Cancellation control = new Cancellation();
+
+        Event event = GeneratedEvents.create(type, fields);
+        if (event != null) {
+            loaded.subscriptions().dispatch(type, event, control, problems);
+            return Envelopes.verdict(seq, EventCodec.verdict(event, control.cancelled()));
+        }
+        return dispatchCustom(seq, pluginId, loaded, type, fields, control, problems);
+    }
+
+    /// Runs a plugin-defined event through the class this plugin declared for
+    /// it.
+    ///
+    /// The payload is positional and this side has no generated factory for it,
+    /// so the codec of whichever handler subscribed is what builds the object —
+    /// which is also what makes a mismatched layout an error naming the field
+    /// rather than a handler reading somebody else's price.
+    ///
+    /// What the handlers changed is worked out by comparing the object
+    /// afterwards. Effects are not collected: the author's class is an ordinary
+    /// one and has nowhere to record them, which is a gap rather than a
+    /// decision — a subscriber to a plugin-defined event cannot yet message a
+    /// player.
+    private Envelope dispatchCustom(long seq, String pluginId, LoadedPlugin loaded, String type,
+            List<fr.gocraft.api.Value> fields, Cancellation control,
+            Subscriptions.ProblemReporter problems) {
+        CustomEvent codec = loaded.subscriptions().codecFor(type);
+        if (codec == null) {
+            // An event nothing here handles, or one this build does not know.
+            // Allowing is the only honest answer: refusing something we cannot
+            // inspect would stop gameplay on the strength of a version mismatch.
+            System.err.println("gocraft-runtime: " + pluginId + " was sent " + type
+                    + ", which no handler here declares");
             return allow(seq);
         }
-        loaded.subscriptions().dispatch(event.type(), event, (handler, thrown) ->
-                System.err.println("gocraft-runtime: " + pluginId + " handler " + handler
-                        + " threw " + thrown));
-        return Envelopes.verdict(seq, EventCodec.verdict(event));
+        Object event;
+        try {
+            event = codec.create(fields);
+        } catch (RuntimeException malformed) {
+            // The provider and this subscriber disagree about the layout. Said
+            // out loud and allowed, rather than cancelling on a decode failure:
+            // whatever the event announced is not this plugin's to refuse over
+            // a bug of its own.
+            System.err.println("gocraft-runtime: " + pluginId + " cannot read " + type
+                    + ": " + malformed.getMessage());
+            return allow(seq);
+        }
+        loaded.subscriptions().dispatch(type, event, control, problems);
+        return Envelopes.verdict(seq, Verdict.newBuilder()
+                .setCancelled(control.cancelled())
+                .addAllMutations(EventCodec.changes(fields, codec.fields(event)))
+                .build());
     }
 
     /// Runs one command in one plugin and answers.

@@ -47,4 +47,17 @@ public final class GeneratedEvents {
     public static boolean knows(String type) {
         return BY_TYPE.containsKey(type);
     }
+
+    /// Whether a subscriber may refuse this event.
+    ///
+    /// Generated with the rest, because it decides whether a handler is allowed
+    /// to ask for an EventControl — and a list kept by hand would eventually
+    /// refuse a cancel the schema allows, or accept one it does not.
+    public static boolean cancellable(String type) {
+        return CANCELLABLE.contains(type);
+    }
+
+    private static final java.util.Set<String> CANCELLABLE = java.util.Set.of(
+            BlockBreakEvent.TYPE
+    );
 }
