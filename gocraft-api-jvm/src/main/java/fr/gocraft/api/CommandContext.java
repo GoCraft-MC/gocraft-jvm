@@ -170,7 +170,7 @@ public final class CommandContext implements EffectSink {
     /// drops the message. Check [CommandSender#isPlayer()] before relying on a
     /// reply being seen.
     public void reply(String message) {
-        effect("chat.message", playerValue(sender.player()), Values.text(message));
+        effect(Effects.MESSAGE, sender.player().value(), Values.text(message));
     }
 
     /// Records a side effect by name, for calls this API has no method for yet.
@@ -190,26 +190,6 @@ public final class CommandContext implements EffectSink {
     @Override
     public void add(String call, List<Value> values) {
         effects.add(new Effect(call, values));
-    }
-
-    /// The PlayerRef shape the host reads back: uuid, username, edition. It has
-    /// to match what the host wrote, so it is built here rather than by each
-    /// caller.
-    private static Value playerValue(PlayerRef player) {
-        if (!player.present()) {
-            return Values.list();
-        }
-        java.nio.ByteBuffer uuid = java.nio.ByteBuffer.allocate(16);
-        uuid.putLong(player.uuid().getMostSignificantBits());
-        uuid.putLong(player.uuid().getLeastSignificantBits());
-        return Values.list(
-                Values.bytes(uuid.array()),
-                Values.text(player.username()),
-                Values.text(switch (player.edition()) {
-                    case JAVA -> "java";
-                    case BEDROCK -> "bedrock";
-                    case UNKNOWN -> "";
-                }));
     }
 
     // ── For the runtime ───────────────────────────────────────────────────────

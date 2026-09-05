@@ -130,11 +130,34 @@ public final class PlayerRef {
                     "this player handle belongs to no dispatch, so " + this
                             + " cannot be sent anything");
         }
-        sink.add("chat.message", List.of(uuidValue(), new Value.Text(message)));
+        sink.add(Effects.MESSAGE, List.of(uuidValue(), new Value.Text(message)));
     }
 
-    /// The uuid as the wire carries it, which is how an effect names a
-    /// recipient.
+    /// This player as an event carries one: uuid, username, edition.
+    ///
+    /// Public because three code generators were each writing this shape out by
+    /// hand — two of them as string literals inside emitters in different
+    /// repositories. It has to match what PlayerRef.of reads back, so it is
+    /// built here and nowhere else.
+    ///
+    /// An absent player is an empty list, which is what the host writes when
+    /// there is no acting player: the wire has no null and a fixed layout would
+    /// have to special-case one anyway.
+    public Value value() {
+        if (!present()) {
+            return new Value.List(List.of());
+        }
+        return new Value.List(List.of(uuidValue(),
+                new Value.Text(username),
+                new Value.Text(switch (edition) {
+                    case JAVA -> "java";
+                    case BEDROCK -> "bedrock";
+                    case UNKNOWN -> "";
+                })));
+    }
+
+    /// The uuid alone, which is how an effect names a recipient: a handle from
+    /// a plugin-defined event has only an id to give.
     private Value uuidValue() {
         ByteBuffer buffer = ByteBuffer.allocate(16);
         buffer.putLong(uuid.getMostSignificantBits());

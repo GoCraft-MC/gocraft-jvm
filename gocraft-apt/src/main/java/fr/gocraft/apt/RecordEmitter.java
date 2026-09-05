@@ -80,9 +80,6 @@ final class RecordEmitter extends ValueEmitter {
         line(2, ");");
         line(1, "}");
 
-        if (carriesAPlayer(layout)) {
-            writePlayerHelper();
-        }
         line(0, "}");
         return out.toString();
     }

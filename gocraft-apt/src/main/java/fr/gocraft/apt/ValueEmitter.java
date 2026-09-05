@@ -32,7 +32,7 @@ abstract class ValueEmitter {
     protected String encodeValue(Carried carried, String source) {
         return switch (carried) {
             case Carried.Scalar scalar -> "new Value." + scalar.kind().record + "(" + source + ")";
-            case Carried.Player ignored -> "playerValue(" + source + ")";
+            case Carried.Player ignored -> source + ".value()";
             case Carried.Compound compound -> compound.codec() + ".encode(" + source + ")";
             case Carried.Listed ignored ->
                     throw new IllegalStateException("a list is written by encodeList");
@@ -125,40 +125,4 @@ abstract class ValueEmitter {
         return source;
     }
 
-    // ── The PlayerRef helper, written only where it is used ───────────────────
-
-    protected static boolean carriesAPlayer(List<EventProcessor.Field> layout) {
-        for (EventProcessor.Field field : layout) {
-            Carried carried = field.carried() instanceof Carried.Listed listed
-                    ? listed.element()
-                    : field.carried();
-            if (carried instanceof Carried.Player) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    /// The PlayerRef shape the host reads back: uuid, username, edition.
-    ///
-    /// Written into the codec rather than called from the API, because the API
-    /// jar a plugin compiles against has no encoder — it deliberately has no
-    /// dependency at all, not even protobuf, so that a plugin cannot reach the
-    /// transport.
-    protected void writePlayerHelper() {
-        blank();
-        line(1, "private static Value playerValue(fr.gocraft.api.PlayerRef player) {");
-        line(2, "java.nio.ByteBuffer uuid = java.nio.ByteBuffer.allocate(16);");
-        line(2, "uuid.putLong(player.uuid().getMostSignificantBits());");
-        line(2, "uuid.putLong(player.uuid().getLeastSignificantBits());");
-        line(2, "return new Value.List(List.of(");
-        line(3, "new Value.Bytes(uuid.array()),");
-        line(3, "new Value.Text(player.username()),");
-        line(3, "new Value.Text(switch (player.edition()) {");
-        line(4, "case JAVA -> \"java\";");
-        line(4, "case BEDROCK -> \"bedrock\";");
-        line(4, "case UNKNOWN -> \"\";");
-        line(3, "})));");
-        line(1, "}");
-    }
 }

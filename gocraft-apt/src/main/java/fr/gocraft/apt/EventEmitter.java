@@ -54,9 +54,6 @@ final class EventEmitter extends ValueEmitter {
         blank();
         writeCreate(simple, declared, layout);
 
-        if (carriesAPlayer(layout)) {
-            writePlayerHelper();
-        }
         line(0, "}");
         return out.toString();
     }
