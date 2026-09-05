@@ -62,6 +62,17 @@ public abstract class BundleTask extends DefaultTask {
     @PathSensitive(PathSensitivity.RELATIVE)
     public abstract ConfigurableFileCollection getCommands();
 
+    /// The event layouts gocraft-apt wrote, for the same reason and in the same
+    /// shape: most plugins define no events, and a collection is allowed to be
+    /// empty where an optional file property is not.
+    ///
+    /// The packer merges them into the manifest it writes into the bundle, so
+    /// the events a plugin defines are described by the classes the compiler
+    /// saw rather than by a block the author kept in step by hand.
+    @InputFiles
+    @PathSensitive(PathSensitivity.RELATIVE)
+    public abstract ConfigurableFileCollection getEvents();
+
     @OutputFile
     public abstract RegularFileProperty getBundle();
 
@@ -89,6 +100,13 @@ public abstract class BundleTask extends DefaultTask {
         for (File declared : getCommands()) {
             if (declared.isFile()) {
                 arguments.add("-commands");
+                arguments.add(declared.getAbsolutePath());
+                break;
+            }
+        }
+        for (File declared : getEvents()) {
+            if (declared.isFile()) {
+                arguments.add("-events");
                 arguments.add(declared.getAbsolutePath());
                 break;
             }

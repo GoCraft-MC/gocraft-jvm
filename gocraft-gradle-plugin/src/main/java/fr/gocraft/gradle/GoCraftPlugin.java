@@ -117,6 +117,8 @@ public final class GoCraftPlugin implements Plugin<Project> {
             // allowed to be empty where an input file would not be.
             task.getCommands().from(project.getLayout().getBuildDirectory()
                     .file("classes/java/main/gocraft/commands.json"));
+            task.getEvents().from(project.getLayout().getBuildDirectory()
+                    .file("classes/java/main/gocraft/events.json"));
         });
     }
 

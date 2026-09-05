@@ -18,7 +18,9 @@ import javax.lang.model.element.Modifier;
 import javax.lang.model.element.NestingKind;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.element.VariableElement;
+import javax.tools.FileObject;
 import javax.tools.JavaFileObject;
+import javax.tools.StandardLocation;
 
 /// Turns a class an author wrote into the codec the runtime reads it through.
 ///
@@ -40,9 +42,19 @@ public final class EventProcessor extends AbstractProcessor {
         return SourceVersion.latestSupported();
     }
 
+    /// Every event seen so far, kept because the dump describes all of them at
+    /// once and javac hands them over a round at a time.
+    private final List<LayoutDump.Declared> declared = new ArrayList<>();
+
     @Override
     public boolean process(Set<? extends TypeElement> annotations, RoundEnvironment round) {
         Diagnostics diagnostics = new Diagnostics(processingEnv.getMessager());
+        if (round.processingOver()) {
+            // Written last, when there is nothing more to add. A dump per round
+            // would describe whichever events that round happened to carry.
+            writeDump(diagnostics);
+            return true;
+        }
         for (Element element : round.getElementsAnnotatedWith(PluginEvent.class)) {
             if (element.getKind() != ElementKind.CLASS) {
                 diagnostics.error("@PluginEvent declares an event, so it belongs on a class",
@@ -103,6 +115,27 @@ public final class EventProcessor extends AbstractProcessor {
             return;
         }
         write(type, declared, layout, diagnostics);
+        this.declared.add(new LayoutDump.Declared(declared, layout));
+    }
+
+    /// Hands the layouts to gocraft-cli, which writes them into the manifest.
+    ///
+    /// Nothing is written when a plugin declares no events, so a build that has
+    /// none leaves no artefact for the packer to wonder about.
+    private void writeDump(Diagnostics diagnostics) {
+        if (declared.isEmpty()) {
+            return;
+        }
+        try {
+            FileObject file = processingEnv.getFiler()
+                    .createResource(StandardLocation.CLASS_OUTPUT, "", LayoutDump.PATH);
+            try (Writer writer = file.openWriter()) {
+                writer.write(new LayoutDump().render(declared));
+            }
+        } catch (IOException failure) {
+            diagnostics.error("could not write " + LayoutDump.PATH + ": " + failure.getMessage(),
+                    null);
+        }
     }
 
     /// Whether the event can be rebuilt from a payload.
@@ -267,16 +300,24 @@ public final class EventProcessor extends AbstractProcessor {
     /// price of 0 that nobody set. Refusing by name leaves the decision with
     /// the author.
     enum Kind {
-        BOOL("Bool"),
-        INT("Int"),
-        DECIMAL("Decimal"),
-        TEXT("Text"),
-        BYTES("Bytes");
+        BOOL("Bool", "bool"),
+        INT("Int", "int"),
+        DECIMAL("Decimal", "double"),
+        TEXT("Text", "string"),
+        BYTES("Bytes", "bytes");
 
+        /// The Value record this kind travels as.
         final String record;
 
-        Kind(String record) {
+        /// How the manifest spells it, which is not always how Java does: a
+        /// short and a long are both an int on the wire, and a float and a
+        /// double are both a double. The manifest describes what crosses, not
+        /// what the author declared.
+        final String manifest;
+
+        Kind(String record, String manifest) {
             this.record = record;
+            this.manifest = manifest;
         }
 
         static Kind of(String declared) {
