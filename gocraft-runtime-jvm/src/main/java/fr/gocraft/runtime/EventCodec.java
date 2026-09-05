@@ -101,9 +101,14 @@ final class EventCodec {
     /// the wire carries the same mutations either way, and how they were
     /// produced is each runtime's own business.
     ///
-    /// One entry per top-level field, which is exact today: an event carries
-    /// primitives, String and byte[], so a change is always a whole field. When
-    /// nested values arrive the paths will need to go deeper, and this is where.
+    /// As deep as the change went, which is not a refinement but a requirement.
+    /// The host authorises a write by the depth of its path — MutablePath
+    /// answers a length-one path from the field's own mutability and anything
+    /// deeper from the field existing at all — so emitting a whole-field
+    /// mutation for a record changed inside an immutable list gets it refused,
+    /// while the same author code running on the Go side, which walks in, gets
+    /// it applied. The rule belongs to the contract; abi.Diff states it, and
+    /// this is its second reading.
     ///
     /// A byte[] is compared by content, at any depth. Value.Bytes is a record,
     /// so its equals is the array's — identity — and that reaches further than
@@ -113,17 +118,37 @@ final class EventCodec {
     static List<Mutation> changes(List<fr.gocraft.api.Value> before,
             List<fr.gocraft.api.Value> after) {
         List<Mutation> mutations = new ArrayList<>();
-        int shared = Math.min(before.size(), after.size());
-        for (int index = 0; index < shared; index++) {
-            if (same(before.get(index), after.get(index))) {
+        changesInto(mutations, List.of(), before, after);
+        return mutations;
+    }
+
+    private static void changesInto(List<Mutation> mutations, List<Integer> path,
+            List<fr.gocraft.api.Value> before, List<fr.gocraft.api.Value> after) {
+        if (before.size() != after.size()) {
+            return;
+        }
+        for (int index = 0; index < before.size(); index++) {
+            fr.gocraft.api.Value left = before.get(index);
+            fr.gocraft.api.Value right = after.get(index);
+            // Lists first, and without asking same(): it would walk the
+            // children to answer and the recursion walks them again.
+            if (left instanceof fr.gocraft.api.Value.List(List<fr.gocraft.api.Value> from)
+                    && right instanceof fr.gocraft.api.Value.List(List<fr.gocraft.api.Value> to)
+                    && from.size() == to.size()) {
+                List<Integer> deeper = new ArrayList<>(path);
+                deeper.add(index);
+                changesInto(mutations, deeper, from, to);
                 continue;
             }
-            mutations.add(Mutation.newBuilder()
-                    .addPath(index)
-                    .setValue(wire(after.get(index)))
-                    .build());
+            if (same(left, right)) {
+                continue;
+            }
+            Mutation.Builder mutation = Mutation.newBuilder();
+            for (Integer step : path) {
+                mutation.addPath(step);
+            }
+            mutations.add(mutation.addPath(index).setValue(wire(right)).build());
         }
-        return mutations;
     }
 
     private static boolean same(fr.gocraft.api.Value before, fr.gocraft.api.Value after) {
