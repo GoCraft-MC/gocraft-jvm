@@ -15,6 +15,9 @@ import java.util.Locale;
 import org.gradle.api.DefaultTask;
 import org.gradle.api.GradleException;
 import org.gradle.api.file.RegularFileProperty;
+import org.gradle.api.tasks.InputFile;
+import org.gradle.api.tasks.PathSensitive;
+import org.gradle.api.tasks.PathSensitivity;
 import org.gradle.api.provider.Property;
 import org.gradle.api.tasks.Input;
 import org.gradle.api.tasks.OutputFile;
@@ -40,17 +43,26 @@ public abstract class ResolveToolTask extends DefaultTask {
     public abstract Property<String> getRepository();
 
     /// A packer the author supplied. Set means nothing is fetched.
-    @Input
+    ///
+    /// Tracked by content, not by path. As a plain string it was the path that
+    /// was the input, so a packer rebuilt in place left this task up to date
+    /// and the copy from the previous build kept running — which is the whole
+    /// reason somebody points toolPath at a build of their own.
+    ///
+    /// NONE, because that path is absolute and belongs to one machine: what
+    /// matters is which bytes are about to be run, never where they sit.
+    @InputFile
     @org.gradle.api.tasks.Optional
-    public abstract Property<String> getLocal();
+    @PathSensitive(PathSensitivity.NONE)
+    public abstract RegularFileProperty getLocal();
 
     @OutputFile
     public abstract RegularFileProperty getTool();
 
     @TaskAction
     public void resolve() {
-        if (getLocal().isPresent() && !getLocal().get().isBlank()) {
-            Path supplied = Path.of(getLocal().get());
+        if (getLocal().isPresent()) {
+            Path supplied = getLocal().get().getAsFile().toPath();
             if (!Files.isRegularFile(supplied)) {
                 throw new GradleException("gocraft.toolPath is " + supplied + ", which is not a file");
             }

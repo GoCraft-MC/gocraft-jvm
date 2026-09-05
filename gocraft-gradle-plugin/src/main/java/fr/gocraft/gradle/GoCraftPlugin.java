@@ -91,7 +91,7 @@ public final class GoCraftPlugin implements Plugin<Project> {
             task.setDescription("Downloads and verifies the bundle packer for this machine.");
             task.getVersion().set(extension.getToolVersion());
             task.getRepository().set(extension.getToolRepository());
-            task.getLocal().set(extension.getToolPath());
+            task.getLocal().fileProvider(extension.getToolPath().map(java.io.File::new));
             task.getTool().set(project.getLayout().getBuildDirectory()
                     .file(extension.getToolVersion().map(name -> "gocraft/tool/gocraft-cli-" + name)));
         });
