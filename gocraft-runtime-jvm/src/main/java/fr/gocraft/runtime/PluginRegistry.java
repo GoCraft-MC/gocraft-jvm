@@ -29,13 +29,26 @@ final class PluginRegistry implements AutoCloseable {
 
     private final Map<String, LoadedPlugin> plugins = new ConcurrentHashMap<>();
     private final PluginLoader loader;
+    private final Emitter emitter;
 
-    PluginRegistry() {
-        this(defaultWorkDirectory());
+    PluginRegistry(Emitter emitter) {
+        this(defaultWorkDirectory(), emitter);
     }
 
     PluginRegistry(Path workDirectory) {
+        this(workDirectory, null);
+    }
+
+    PluginRegistry(Path workDirectory, Emitter emitter) {
         this.loader = new PluginLoader(workDirectory);
+        this.emitter = emitter;
+    }
+
+    /// The publisher this runtime's plugins emit through. Null in a test that
+    /// builds a registry with no connection behind it; a plugin that tries to
+    /// emit then learns so by name rather than by NullPointerException.
+    Emitter emitter() {
+        return emitter;
     }
 
     private static Path defaultWorkDirectory() {
@@ -62,7 +75,8 @@ final class PluginRegistry implements AutoCloseable {
         }
         try {
             LoadedPlugin loaded = loader.load(id, request.getBundlePath(), request.getEntry(),
-                    request.getDataDirectory(), request.getCommandTree());
+                    request.getDataDirectory(), request.getCommandTree(),
+                    EventBindings.of(request.getEventTypesList()), emitter);
             plugins.put(id, loaded);
             // What the plugin actually registered. The host checks it against
             // the manifest it validated and refuses anything undeclared, which

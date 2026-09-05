@@ -85,8 +85,14 @@ public final class Main {
             return EXIT_ABI_MISMATCH;
         }
 
-        try (PluginRegistry registry = new PluginRegistry()) {
+        Emitter emitter = new Emitter(connection);
+        try (PluginRegistry registry = new PluginRegistry(emitter)) {
             return loop(connection, registry);
+        } finally {
+            // Whatever ended the loop, a plugin still waiting on an emission
+            // has to be woken: a parked virtual thread would keep this process
+            // alive after the host is gone.
+            emitter.shutdown();
         }
     }
 
@@ -99,6 +105,7 @@ public final class Main {
     /// it. LOAD is the deliberate exception: it is sequential by contract, and
     /// the host waits for each one before sending the next.
     private static int loop(Connection connection, PluginRegistry registry) throws IOException {
+        Emitter emitter = registry.emitter();
         while (true) {
             Envelope envelope;
             try {
@@ -151,6 +158,11 @@ public final class Main {
                 // Answered here rather than by a handler, so a runtime busy
                 // running plugin code still pongs. Silence has to mean stuck,
                 // not merely busy, or the heartbeat measures the wrong thing.
+                // The answer to an emission a plugin published. Completed on
+                // this thread on purpose — the plugin waiting on it may be the
+                // very virtual thread a DISPATCH is occupying, and completing a
+                // future does not block.
+                case EMITTED -> emitter.deliver(seq, envelope.getEmitted());
                 case PING -> connection.send(Envelopes.pong(seq));
                 case READY -> {
                     // The load phase is over. Nothing to do until there are
