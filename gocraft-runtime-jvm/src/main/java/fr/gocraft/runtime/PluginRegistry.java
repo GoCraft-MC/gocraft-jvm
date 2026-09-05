@@ -79,6 +79,10 @@ final class PluginRegistry implements AutoCloseable {
                     request.getDataDirectory(), request.getCommandTree(),
                     EventBindings.of(request.getEventTypesList()), emitter);
             plugins.put(id, loaded);
+            // Before the reply, so the host cannot dispatch into a cold runtime
+            // between the two. It is waiting for this LOAD anyway, and it waits
+            // without a budget.
+            Warmup.run();
             // What the plugin actually registered. The host checks it against
             // the manifest it validated and refuses anything undeclared, which
             // it would otherwise never route — leaving the author with a
