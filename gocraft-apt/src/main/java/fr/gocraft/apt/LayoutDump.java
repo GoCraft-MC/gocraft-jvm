@@ -39,7 +39,7 @@ final class LayoutDump {
         int remaining = records.size();
         for (java.util.Map.Entry<String, List<EventProcessor.Field>> record : records.entrySet()) {
             out.append("    {\n");
-            out.append("      \"name\": ").append(quote(record.getKey())).append(",\n");
+            out.append("      \"name\": ").append(Json.quote(record.getKey())).append(",\n");
             out.append("      \"fields\": [\n");
             List<EventProcessor.Field> layout = record.getValue();
             for (int index = 0; index < layout.size(); index++) {
@@ -60,7 +60,7 @@ final class LayoutDump {
 
     private void event(Declared declared, boolean last) {
         out.append("    {\n");
-        out.append("      \"type\": ").append(quote(declared.annotation().value())).append(",\n");
+        out.append("      \"type\": ").append(Json.quote(declared.annotation().value())).append(",\n");
         out.append("      \"cancellable\": ").append(declared.annotation().cancellable()).append(",\n");
         out.append("      \"failClosed\": ").append(declared.annotation().failClosed()).append(",\n");
         out.append("      \"fields\": [\n");
@@ -73,35 +73,10 @@ final class LayoutDump {
     }
 
     private void field(EventProcessor.Field field, boolean last) {
-        out.append("        { \"name\": ").append(quote(field.name()))
-                .append(", \"type\": ").append(quote(field.carried().manifest()))
+        out.append("        { \"name\": ").append(Json.quote(field.name()))
+                .append(", \"type\": ").append(Json.quote(field.carried().manifest()))
                 .append(", \"mutable\": ").append(field.mutable())
                 .append(" }").append(last ? "\n" : ",\n");
     }
 
-    /// A JSON string. Names and types have been through the processor, which
-    /// accepts identifiers and dotted names only, so nothing needs escaping
-    /// today — done anyway, because "the input cannot contain a quote" stays
-    /// true until it does not.
-    private static String quote(String value) {
-        StringBuilder quoted = new StringBuilder(value.length() + 2).append('"');
-        for (int index = 0; index < value.length(); index++) {
-            char character = value.charAt(index);
-            switch (character) {
-                case '"' -> quoted.append("\\\"");
-                case '\\' -> quoted.append("\\\\");
-                case '\n' -> quoted.append("\\n");
-                case '\r' -> quoted.append("\\r");
-                case '\t' -> quoted.append("\\t");
-                default -> {
-                    if (character < 0x20) {
-                        quoted.append(String.format("\\u%04x", (int) character));
-                    } else {
-                        quoted.append(character);
-                    }
-                }
-            }
-        }
-        return quoted.append('"').toString();
-    }
 }
