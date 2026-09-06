@@ -119,6 +119,11 @@ public final class GoCraftPlugin implements Plugin<Project> {
                     .file("classes/java/main/gocraft/commands.json"));
             task.getEvents().from(project.getLayout().getBuildDirectory()
                     .file("classes/java/main/gocraft/events.json"));
+            // Beside plugin.toml, in the project: it is the record of what this
+            // plugin has already published, and it belongs in git next to the
+            // manifest it guards.
+            task.getLayoutLock().set(
+                    project.getLayout().getProjectDirectory().file("events.lock.json"));
         });
     }
 
