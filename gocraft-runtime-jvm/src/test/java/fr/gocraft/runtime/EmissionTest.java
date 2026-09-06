@@ -142,14 +142,5 @@ class EmissionTest {
         public Object create(List<Value> fields, fr.gocraft.api.EffectSink sink) {
             return new TestEvent();
         }
-
-        /// The payload the runtime warms this codec with at load. The same
-        /// shape as purchase(), because that is what the generated one would
-        /// be: a blank whose shape disagreed with the real payload would warm
-        /// the branch a real event never takes.
-        @Override
-        public List<Value> blank() {
-            return purchase();
-        }
     }
 }

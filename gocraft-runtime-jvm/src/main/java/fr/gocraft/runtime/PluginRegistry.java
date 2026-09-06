@@ -125,10 +125,10 @@ final class PluginRegistry implements AutoCloseable {
         if (loaded == null) {
             return allow(seq);
         }
-        String type = request.getEvent().getType();
         if (request.getWarm()) {
-            return warm(seq, loaded, type);
+            return warm(seq, loaded, request);
         }
+        String type = request.getEvent().getType();
         var fields = EventCodec.fields(request.getEvent().getFieldsList());
         Subscriptions.ProblemReporter problems = (handler, thrown) ->
                 System.err.println("gocraft-runtime: " + pluginId + " handler " + handler
@@ -190,33 +190,37 @@ final class PluginRegistry implements AutoCloseable {
     /// The host sends these between LOAD and READY, where it waits without a
     /// budget, so the first real event of a type does not pay for a cold JVM
     /// out of the budget it shares with every other subscriber. It arrives as
-    /// an ordinary DISPATCH down the ordinary socket, which is the point: a
-    /// runtime that warmed itself would warm a copy of this path, and whatever
-    /// the copy left out — the reader loop, the writer thread, the framing,
-    /// protobuf on either side — would still be cold when the tick was waiting.
+    /// an ordinary DISPATCH down the ordinary socket, carrying a payload of the
+    /// event's own shape that the host built — which is the point twice over.
     ///
-    /// The payload comes from here rather than from the host. A codec has to
-    /// know the layout to read a real event, so asking it for one of its own
-    /// shape is cheaper than a wire format that describes the shape twice.
+    /// Once, because a runtime that warmed itself would warm a copy of this
+    /// path, and whatever the copy left out would still be cold when the tick
+    /// was waiting. Twice, because a payload the runtime made for itself never
+    /// crosses the socket: the first version of this sent no values and let
+    /// this side invent them, which left the protobuf parse and the conversion
+    /// — about two milliseconds, once per process — exactly as cold as before.
     ///
-    /// **No handler runs.** The values are placeholders and an author's code
-    /// would be deciding about a purchase nobody made — the one line this
-    /// class does not cross, in a runtime that otherwise warms everything it
-    /// executes itself.
-    private Envelope warm(long seq, LoadedPlugin loaded, String type) {
+    /// So this is [#dispatch] with one thing removed. **No handler runs.** The
+    /// values are placeholders and an author's code would be deciding about a
+    /// purchase nobody made — the one line this runtime does not cross, in a
+    /// warm-up that otherwise runs everything it executes itself.
+    private Envelope warm(long seq, LoadedPlugin loaded, Dispatch request) {
+        String type = request.getEvent().getType();
         Control control = new Control();
         try {
-            CustomEvent codec = loaded.subscriptions().codecFor(type);
-            if (codec == null) {
-                GeneratedEvents.warm(type, control);
-            } else {
-                List<fr.gocraft.api.Value> blank = codec.blank();
-                Object event = codec.create(blank, control);
-                // Both directions, because a dispatch runs both: the object is
-                // read back to work out what the handlers changed, and written
-                // to when the mutations come home.
-                EventCodec.changes(blank, codec.fields(event));
-                codec.setFields(event, blank);
+            List<fr.gocraft.api.Value> fields =
+                    EventCodec.fields(request.getEvent().getFieldsList());
+            Event event = GeneratedEvents.create(type, fields, control);
+            if (event == null) {
+                CustomEvent codec = loaded.subscriptions().codecFor(type);
+                if (codec != null) {
+                    Object custom = codec.create(fields, control);
+                    // Both directions, because a dispatch runs both: the object
+                    // is read back to work out what the handlers changed, and
+                    // written to when the mutations come home.
+                    EventCodec.changes(fields, codec.fields(custom));
+                    codec.setFields(custom, fields);
+                }
             }
         } catch (RuntimeException | Error ignored) {
             // A warm-up that failed has cost the load nothing, and reporting it

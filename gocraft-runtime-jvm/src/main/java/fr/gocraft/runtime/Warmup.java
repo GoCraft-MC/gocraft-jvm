@@ -5,11 +5,12 @@ import java.lang.reflect.Method;
 /// Warms the one part of a dispatch the host's warm-up cannot reach.
 ///
 /// Everything else is warmed by a real DISPATCH the host sends between LOAD and
-/// READY, marked `warm` on the wire: the reader loop, the codecs, the event
-/// class, the writer thread, protobuf on both sides. That is deliberately not
-/// replicated here — this class used to do exactly that, and every piece the
-/// replica forgot stayed cold on the path that mattered. The measurements are
-/// in [PluginRegistry#warm].
+/// READY, marked `warm` on the wire and carrying a payload the host built: the
+/// reader loop, protobuf on both sides, the conversion, the codecs, the event
+/// class, the writer thread. That is deliberately not replicated here — this
+/// class used to do exactly that, and every piece the replica forgot stayed
+/// cold on the path that mattered. The measurements are in
+/// [PluginRegistry#warm].
 ///
 /// What a warm dispatch stops short of is the handler, because the values are
 /// placeholders and an author's code must not decide about a purchase nobody
