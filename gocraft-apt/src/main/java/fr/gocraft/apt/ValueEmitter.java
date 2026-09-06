@@ -36,6 +36,8 @@ abstract class ValueEmitter {
             case Carried.Compound compound -> compound.codec() + ".encode(" + source + ")";
             case Carried.Listed ignored ->
                     throw new IllegalStateException("a list is written by encodeList");
+            case Carried.Keyed ignored ->
+                    throw new IllegalStateException("a map is written by encodeMap");
         };
     }
 
@@ -44,16 +46,60 @@ abstract class ValueEmitter {
         line(depth, "java.util.List<Value> " + target + " = new java.util.ArrayList<>();");
         String item = target + "Item";
         line(depth, "for (" + listed.element().java() + " " + item + " : " + source + ") {");
+        refuseNull(depth + 1, item, "an element of this list");
         line(depth + 1, target + ".add(" + encodeValue(listed.element(), item) + ");");
         line(depth, "}");
     }
 
+    /// The wire has no null, and a container is where one can hide.
+    ///
+    /// A bare field cannot be null — boxed types are refused there for exactly
+    /// this reason — but a `List<Integer>` or a `Map<String, Tier>` can hold
+    /// one, and the author is the only party who can decide what it meant.
+    /// Encoding it as a zero would hand a subscriber a price nobody set; an
+    /// unboxing NPE would name the codec instead of the value. So it is refused
+    /// where it is, in the emitting plugin, before anything crosses.
+    protected void refuseNull(int depth, String source, String what) {
+        line(depth, "if (" + source + " == null) {");
+        line(depth + 1, "throw new IllegalArgumentException(\"" + what
+                + " is null, and the wire has no null\");");
+        line(depth, "}");
+    }
+
+    /// A map, as statements assigning to a fresh local.
+    ///
+    /// Sorted by key on the way out. The wire has no map, so this is a list of
+    /// pairs — and a list has an order, which means an unsorted map would
+    /// serialise differently on two runs of the same event. A bundle is
+    /// byte-reproducible and a mutation path addresses a position; neither
+    /// survives a payload whose order depends on a hash seed.
+    protected void encodeMap(int depth, Carried.Keyed keyed, String source, String target) {
+        line(depth, "java.util.List<Value> " + target + " = new java.util.ArrayList<>();");
+        String keys = target + "Keys";
+        line(depth, "java.util.List<String> " + keys + " = new java.util.ArrayList<>("
+                + source + ".keySet());");
+        line(depth, "java.util.Collections.sort(" + keys + ");");
+        String key = target + "Key";
+        line(depth, "for (String " + key + " : " + keys + ") {");
+        String held = target + "Value";
+        line(depth + 1, keyed.value().java() + " " + held + " = " + source + ".get(" + key + ");");
+        refuseNull(depth + 1, held, "a value of this map");
+        line(depth + 1, target + ".add(new Value.List(List.of(new Value.Text(" + key + "), "
+                + encodeValue(keyed.value(), held) + ")));");
+        line(depth, "}");
+    }
+
     /// One field, however it is shaped, as an expression the caller can put in a
-    /// list. A list leaves its loop behind first.
+    /// list. A list or a map leaves its loop behind first.
     protected String encodeField(int depth, EventProcessor.Field field, String source) {
         if (field.carried() instanceof Carried.Listed listed) {
             String local = field.name() + "Values";
             encodeList(depth, listed, source, local);
+            return "new Value.List(" + local + ")";
+        }
+        if (field.carried() instanceof Carried.Keyed keyed) {
+            String local = field.name() + "Values";
+            encodeMap(depth, keyed, source, local);
             return "new Value.List(" + local + ")";
         }
         return encodeValue(field.carried(), source);
@@ -102,6 +148,30 @@ abstract class ValueEmitter {
                 line(depth + 1, target + ".add(" + target + "Element);");
                 line(depth, "}");
             }
+            // A LinkedHashMap, so what comes out iterates in the order it
+            // arrived — which is sorted, because that is how it was written.
+            case Carried.Keyed keyed -> {
+                String raw = target + "Raw";
+                line(depth, "if (!(" + value + " instanceof Value.List(List<Value> " + raw
+                        + "))) {");
+                line(depth + 1, "throw new IllegalArgumentException(\"" + where
+                        + " is not a map\");");
+                line(depth, "}");
+                line(depth, keyed.java() + " " + target + " = new java.util.LinkedHashMap<>();");
+                String entry = target + "Entry";
+                line(depth, "for (Value " + entry + " : " + raw + ") {");
+                line(depth + 1, "if (!(" + entry + " instanceof Value.List(List<Value> "
+                        + entry + "Pair)) || " + entry + "Pair.size() < 2");
+                line(depth + 2, "|| !(" + entry + "Pair.get(0) instanceof Value.Text(String "
+                        + entry + "Key))) {");
+                line(depth + 2, "throw new IllegalArgumentException(\"an entry of " + where
+                        + " is not a key and a value\");");
+                line(depth + 1, "}");
+                decodeValue(depth + 1, keyed.value(), entry + "Pair.get(1)", target + "Value",
+                        "a value of " + where);
+                line(depth + 1, target + ".put(" + entry + "Key, " + target + "Value);");
+                line(depth, "}");
+            }
         }
     }
 
@@ -119,8 +189,11 @@ abstract class ValueEmitter {
     /// A Value.Int carries a long, and a field that holds an int has to be
     /// narrowed on the way in or the codec would not compile.
     private static String narrow(Carried.Scalar scalar, String source) {
-        if (scalar.kind().narrows() && !scalar.java().equals(carriedType(scalar.kind()))) {
-            return "(" + scalar.java() + ") " + source;
+        String target = EventProcessor.Kind.primitiveOf(scalar.java());
+        if (scalar.kind().narrows() && !target.equals(carriedType(scalar.kind()))) {
+            // Through the primitive, never through the box: a long does not
+            // cast to an Integer, it narrows to an int and autoboxes.
+            return "(" + target + ") " + source;
         }
         return source;
     }

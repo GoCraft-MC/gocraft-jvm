@@ -263,6 +263,58 @@ class EventProcessorTest {
         assertTrue(codec.contains("target.buyer().value()"), codec);
     }
 
+    /// §10 allows "List/Map of those". The wire has no map kind, so it travels
+    /// as a list of key/value pairs — the shape the injected permission map and
+    /// a block's properties already take.
+    ///
+    /// Sorted on the way out, and that is not cosmetic: a list has an order, so
+    /// an unsorted map would serialise differently on two runs of the same
+    /// event. A bundle is byte-reproducible and a mutation path addresses a
+    /// position; neither survives a payload ordered by a hash seed.
+    @Test
+    void carriesAMapKeyedByString() throws IOException {
+        String codec = Javac.compile("StockEvent", """
+                import fr.gocraft.api.PluginEvent;
+                import java.util.Map;
+
+                @PluginEvent("fr.oreo.shop/stock")
+                public final class StockEvent {
+                    private Map<String, Integer> counts;
+
+                    public StockEvent(Map<String, Integer> counts) { this.counts = counts; }
+
+                    public Map<String, Integer> counts() { return counts; }
+                    public void setCounts(Map<String, Integer> counts) { this.counts = counts; }
+                }
+                """, PROCESSOR).source("StockEventLayout");
+        assertTrue(codec.contains("java.util.Collections.sort("), codec);
+        assertTrue(codec.contains("new Value.Text(countsValuesKey)"), codec);
+        assertTrue(codec.contains("new java.util.LinkedHashMap<>()"), codec);
+        // A bare Integer field is refused because the wire has no null; inside a
+        // Map it is the only way to say it, so the codec refuses the null
+        // instead — in the emitting plugin, where the author can act on it.
+        assertTrue(codec.contains("is null, and the wire has no null"), codec);
+    }
+
+    /// One level, exactly as a list is. Nesting either inside the other would
+    /// mean deciding how deep a mutation path may reach before anybody has
+    /// written one, and the manifest refuses the same shapes.
+    @Test
+    void refusesAMapOfMaps() throws IOException {
+        Javac.Result result = Javac.compile("NestedEvent", """
+                import fr.gocraft.api.PluginEvent;
+                import java.util.Map;
+
+                @PluginEvent("fr.oreo.shop/nested")
+                public final class NestedEvent {
+                    private final Map<String, Map<String, Integer>> deep;
+                    public NestedEvent(Map<String, Map<String, Integer>> deep) { this.deep = deep; }
+                    public Map<String, Map<String, Integer>> deep() { return deep; }
+                }
+                """, PROCESSOR);
+        assertFalse(result.firstError().isBlank(), "a map of maps was accepted");
+    }
+
     /// The wire is a finite positional payload with no pointers, so a record
     /// reaching itself is not a shape that could be encoded at all.
     @Test

@@ -236,9 +236,11 @@ public final class EventProcessor extends AbstractProcessor {
             return false;
         }
         for (Field field : records.getOrDefault(from, List.of())) {
-            Carried carried = field.carried() instanceof Carried.Listed listed
-                    ? listed.element()
-                    : field.carried();
+            Carried carried = switch (field.carried()) {
+                case Carried.Listed listed -> listed.element();
+                case Carried.Keyed keyed -> keyed.value();
+                default -> field.carried();
+            };
             if (!(carried instanceof Carried.Compound compound)) {
                 continue;
             }
@@ -461,13 +463,31 @@ public final class EventProcessor extends AbstractProcessor {
         // how deep a mutation path may reach before anybody has written one.
         if (declared.startsWith(LIST_PREFIX) && declared.endsWith(">")) {
             String element = declared.substring(LIST_PREFIX.length(), declared.length() - 1);
-            Carried inside = simpleCarriedBy(element);
+            Carried inside = containedCarriedBy(element);
             return inside == null ? null : new Carried.Listed(inside, declared);
+        }
+        // One level of map, keyed by String and only by String — see
+        // Carried.Keyed for why the key is not a choice.
+        if (declared.startsWith(MAP_PREFIX) && declared.endsWith(">")) {
+            String value = declared.substring(MAP_PREFIX.length(), declared.length() - 1);
+            Carried inside = containedCarriedBy(value);
+            return inside == null ? null : new Carried.Keyed(inside, declared);
         }
         return simpleCarriedBy(declared);
     }
 
     private static final String LIST_PREFIX = "java.util.List<";
+    private static final String MAP_PREFIX = "java.util.Map<java.lang.String,";
+
+    /// The same as [#simpleCarriedBy] plus the boxed scalars, for the inside of
+    /// a List or a Map where a primitive cannot go.
+    private Carried containedCarriedBy(String declared) {
+        Kind boxed = Kind.boxed(declared);
+        if (boxed != null) {
+            return new Carried.Scalar(boxed, declared);
+        }
+        return simpleCarriedBy(declared);
+    }
 
     private Carried simpleCarriedBy(String declared) {
         Kind kind = Kind.of(declared);
@@ -526,6 +546,44 @@ public final class EventProcessor extends AbstractProcessor {
                 case "java.lang.String" -> TEXT;
                 case "byte[]" -> BYTES;
                 default -> null;
+            };
+        }
+
+        /// The same, for a boxed number inside a List or a Map.
+        ///
+        /// A bare `Integer` field stays refused, and that rule keeps its
+        /// reason: it can be null, the wire has no null, and choosing silently
+        /// between a zero and a refusal is how a subscriber reads a price
+        /// nobody set. But a Java container cannot hold a primitive, so
+        /// refusing boxed types everywhere refuses `Map<String, Integer>` —
+        /// which is the first map anybody writes.
+        ///
+        /// So a boxed type is allowed exactly where it is the only way to say
+        /// it, and the generated codec refuses a null element by name rather
+        /// than encoding one.
+        static Kind boxed(String declared) {
+            return switch (declared) {
+                case "java.lang.Boolean" -> BOOL;
+                case "java.lang.Byte", "java.lang.Short",
+                     "java.lang.Integer", "java.lang.Long" -> INT;
+                case "java.lang.Float", "java.lang.Double" -> DECIMAL;
+                default -> null;
+            };
+        }
+
+        /// The primitive a boxed type narrows through on the way in. A long out
+        /// of a Value.Int cannot cast straight to an Integer; it narrows to an
+        /// int and autoboxes from there.
+        static String primitiveOf(String declared) {
+            return switch (declared) {
+                case "java.lang.Boolean" -> "boolean";
+                case "java.lang.Byte" -> "byte";
+                case "java.lang.Short" -> "short";
+                case "java.lang.Integer" -> "int";
+                case "java.lang.Long" -> "long";
+                case "java.lang.Float" -> "float";
+                case "java.lang.Double" -> "double";
+                default -> declared;
             };
         }
 

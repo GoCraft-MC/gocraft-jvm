@@ -62,4 +62,22 @@ sealed interface Carried {
             return "[]" + element.manifest();
         }
     }
+
+    /// A Map of any of the above, keyed by String and only by String.
+    ///
+    /// One key type rather than a choice, because the map has to survive every
+    /// language on the far side: a Lua table indexes by string and a
+    /// number-keyed map is a list with holes in most of the runtimes. An author
+    /// who means "by number" declares a record with a number in it and says
+    /// what the number is.
+    ///
+    /// It travels as a list of key/value pairs, which is the shape the injected
+    /// permission map and a block's properties already take — the wire has no
+    /// map kind and gains none for this.
+    record Keyed(Carried value, String java) implements Carried {
+        @Override
+        public String manifest() {
+            return "map[string]" + value.manifest();
+        }
+    }
 }
