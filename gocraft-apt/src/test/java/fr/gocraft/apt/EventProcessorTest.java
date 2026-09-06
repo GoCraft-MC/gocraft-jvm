@@ -263,30 +263,6 @@ class EventProcessorTest {
         assertTrue(codec.contains("target.buyer().value()"), codec);
     }
 
-    /// A payload of the event's own shape, for the runtime to warm the codec
-    /// with at load. Shaped, because every decoder above refuses a kind it does
-    /// not expect: a blank of the wrong shape would warm the refusal and leave
-    /// the branch a real event takes interpreted.
-    ///
-    /// One element in the list, not none — the loop has to run a round.
-    @Test
-    void writesAPayloadOfItsOwnShape() throws IOException {
-        String codec = Javac.compile("PurchaseEvent", TIERED, PROCESSOR)
-                .source("PurchaseEventLayout");
-        assertTrue(codec.contains("public List<Value> blank()"), codec);
-        assertTrue(codec.contains("new Value.Bytes(new byte[16])"), codec);
-        assertTrue(codec.contains("new Value.List(List.of(TierValues.blank()))"), codec);
-    }
-
-    /// A record nested in an event is warmed with it, one level down, or the
-    /// decode stops at the outer list.
-    @Test
-    void writesAPayloadForANestedRecord() throws IOException {
-        String codec = Javac.compile("PurchaseEvent", TIERED, PROCESSOR)
-                .source("TierValues");
-        assertTrue(codec.contains("static Value blank()"), codec);
-    }
-
     /// The wire is a finite positional payload with no pointers, so a record
     /// reaching itself is not a shape that could be encoded at all.
     @Test

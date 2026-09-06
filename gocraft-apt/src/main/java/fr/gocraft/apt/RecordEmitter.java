@@ -79,24 +79,6 @@ final class RecordEmitter extends ValueEmitter {
         }
         line(2, ");");
         line(1, "}");
-        blank();
-
-        // One level down, the same placeholder an event's own blank() is made
-        // of: a record nested in an event has to be warmed with it, or the
-        // decode stops at the outer list.
-        line(1, "static Value blank() {");
-        if (layout.isEmpty()) {
-            line(2, "return new Value.List(List.of());");
-        } else {
-            line(2, "return new Value.List(List.of(");
-            for (int index = 0; index < layout.size(); index++) {
-                line(3, blankValue(layout.get(index).carried())
-                        + (index + 1 == layout.size() ? "" : ","));
-            }
-            line(2, "));");
-        }
-        line(1, "}");
-
         line(0, "}");
         return out.toString();
     }

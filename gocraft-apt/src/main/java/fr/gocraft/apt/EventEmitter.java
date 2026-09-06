@@ -53,8 +53,6 @@ final class EventEmitter extends ValueEmitter {
         writeSetFields(simple, layout);
         blank();
         writeCreate(simple, declared, layout);
-        blank();
-        writeBlank(layout);
 
         line(0, "}");
         return out.toString();
@@ -133,29 +131,6 @@ final class EventEmitter extends ValueEmitter {
         line(2, "return new " + simple + "(");
         for (int index = 0; index < layout.size(); index++) {
             line(3, layout.get(index).name() + (index + 1 == layout.size() ? "" : ","));
-        }
-        line(2, ");");
-        line(1, "}");
-    }
-
-    /// A payload of this event's own shape, for warming the codec at load.
-    ///
-    /// Generated rather than described to the runtime, because the shape is
-    /// something the compiler already knows on both sides. Sending it over the
-    /// wire would be a second description of one layout, free to disagree with
-    /// this one in the place nothing compares them.
-    private void writeBlank(List<EventProcessor.Field> layout) {
-        line(1, "@Override");
-        line(1, "public List<Value> blank() {");
-        if (layout.isEmpty()) {
-            line(2, "return List.of();");
-            line(1, "}");
-            return;
-        }
-        line(2, "return List.of(");
-        for (int index = 0; index < layout.size(); index++) {
-            line(3, blankValue(layout.get(index).carried())
-                    + (index + 1 == layout.size() ? "" : ","));
         }
         line(2, ");");
         line(1, "}");

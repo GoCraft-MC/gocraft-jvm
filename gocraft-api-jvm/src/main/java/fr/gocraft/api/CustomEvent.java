@@ -90,14 +90,4 @@ public interface CustomEvent {
     /// a handle itself.
     Object create(List<Value> fields, EffectSink sink);
 
-    /// A payload of this event's own shape, carrying nothing.
-    ///
-    /// The runtime runs the codec once at load, on this, so the first real event
-    /// does not pay for a cold decode while the tick waits on it. A payload of
-    /// the wrong shape would warm nothing: every decoder here refuses a kind it
-    /// does not expect, so the branch that matters would stay interpreted.
-    ///
-    /// Shape and never content — an empty name, a zero number, a player who is
-    /// nobody. Nothing built from this is meant to be read as data.
-    List<Value> blank();
 }
