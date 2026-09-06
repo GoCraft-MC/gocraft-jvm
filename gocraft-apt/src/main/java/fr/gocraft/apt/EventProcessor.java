@@ -1,6 +1,7 @@
 package fr.gocraft.apt;
 
 import fr.gocraft.api.EventValue;
+import fr.gocraft.api.ValueAdapter;
 import fr.gocraft.api.PluginEvent;
 
 import java.io.IOException;
@@ -15,6 +16,8 @@ import javax.annotation.processing.AbstractProcessor;
 import javax.annotation.processing.RoundEnvironment;
 import javax.annotation.processing.SupportedAnnotationTypes;
 import javax.lang.model.SourceVersion;
+import javax.lang.model.element.AnnotationMirror;
+import javax.lang.model.element.AnnotationValue;
 import javax.lang.model.element.Element;
 import javax.lang.model.element.ElementKind;
 import javax.lang.model.element.ExecutableElement;
@@ -38,7 +41,8 @@ import javax.tools.StandardLocation;
 /// accessor, a mutable field with no setter, a type no runtime can carry. The
 /// author sees them underlined rather than as a plugin that loads and then
 /// fails to publish anything.
-@SupportedAnnotationTypes({"fr.gocraft.api.PluginEvent", "fr.gocraft.api.EventValue"})
+@SupportedAnnotationTypes({"fr.gocraft.api.PluginEvent", "fr.gocraft.api.EventValue",
+        "fr.gocraft.api.ValueAdapter"})
 public final class EventProcessor extends AbstractProcessor {
 
     @Override
@@ -57,6 +61,13 @@ public final class EventProcessor extends AbstractProcessor {
     /// classes over a round at a time: a record reaching itself through another
     /// cannot be seen while looking at either one alone.
     private final Map<String, List<Field>> records = new LinkedHashMap<>();
+
+    /// The adapters an author registered, by the type each carries.
+    ///
+    /// Collected before anything else is resolved, so a field naming an adapted
+    /// type is answered from a declaration this round has already read rather
+    /// than from whichever order javac happened to hand the classes over.
+    private final Map<String, Carried.Adapted> adapters = new LinkedHashMap<>();
     private final Map<String, String> recordClasses = new LinkedHashMap<>();
 
     @Override
@@ -69,7 +80,18 @@ public final class EventProcessor extends AbstractProcessor {
             writeDump(diagnostics);
             return true;
         }
-        // Records first, so an event naming one is resolved against a layout
+        // Adapters first: a record's own field may be an adapted type, so the
+        // table has to be complete before a record is read.
+        for (Element element : round.getElementsAnnotatedWith(ValueAdapter.class)) {
+            if (element.getKind() != ElementKind.CLASS) {
+                diagnostics.error("@ValueAdapter says how a type crosses the wire, so it "
+                        + "belongs on a class holding the two static methods that move it",
+                        element);
+                continue;
+            }
+            declareAdapter((TypeElement) element, diagnostics);
+        }
+        // Records next, so an event naming one is resolved against a layout
         // this round has already read rather than against the annotation alone.
         for (Element element : round.getElementsAnnotatedWith(EventValue.class)) {
             if (element.getKind() != ElementKind.CLASS) {
@@ -88,6 +110,124 @@ public final class EventProcessor extends AbstractProcessor {
             declare((TypeElement) element, diagnostics);
         }
         return true;
+    }
+
+    /// Reads one @ValueAdapter and records what it carries.
+    ///
+    /// Everything is refused by name rather than discovered later as a codec
+    /// that will not compile. An author writing an adapter is already doing
+    /// something unusual, and a message naming which of the two methods is
+    /// missing is worth more than a stack of javac errors about a generated
+    /// file they never opened.
+    private void declareAdapter(TypeElement type, Diagnostics diagnostics) {
+        String adapter = type.getQualifiedName().toString();
+        String target = adaptedType(type);
+        if (target == null) {
+            diagnostics.error("@ValueAdapter needs the type it carries", type);
+            return;
+        }
+        ExecutableElement encode = staticMethod(type, "encode");
+        ExecutableElement decode = staticMethod(type, "decode");
+        if (encode == null || decode == null) {
+            diagnostics.error(adapter + " needs `public static W encode(" + target
+                    + ")` and `public static " + target + " decode(W)`, where W is what "
+                    + "crosses the wire. Static, because an adapter describes a shape "
+                    + "rather than holding one", type);
+            return;
+        }
+        String parameter = erasureOf(encode.getParameters().get(0).asType().toString());
+        if (!parameter.equals(target)) {
+            diagnostics.error(adapter + " carries " + target + " but its encode takes "
+                    + parameter, encode);
+            return;
+        }
+        String wire = erasureOf(encode.getReturnType().toString());
+        if (!erasureOf(decode.getReturnType().toString()).equals(target)) {
+            diagnostics.error(adapter + " carries " + target + " but its decode returns "
+                    + erasureOf(decode.getReturnType().toString()), decode);
+            return;
+        }
+        if (!erasureOf(decode.getParameters().get(0).asType().toString()).equals(wire)) {
+            diagnostics.error(adapter + " encodes to " + wire + " and decodes from something "
+                    + "else; the two have to meet", decode);
+            return;
+        }
+        // Resolved without consulting the adapter table, so an adapter cannot be
+        // written in terms of another. A chain is a shape nobody can read
+        // backwards from the manifest, which describes only the end of it.
+        Carried carried = simpleWireCarriedBy(wire);
+        if (carried == null) {
+            diagnostics.error(adapter + " encodes " + target + " to " + wire + ", which the "
+                    + "wire does not carry. It has to be a scalar or an @EventValue class — "
+                    + "that is the decision this annotation exists to force", encode);
+            return;
+        }
+        Carried.Adapted existing = adapters.get(target);
+        if (existing != null && !existing.adapter().equals(adapter)) {
+            diagnostics.error(target + " already has an adapter, " + existing.adapter()
+                    + "; which one an event meant would depend on compilation order", type);
+            return;
+        }
+        adapters.put(target, new Carried.Adapted(carried, target, adapter));
+    }
+
+    /// The class the annotation names, read off the mirror rather than off the
+    /// annotation: asking an annotation for a Class while that class is still
+    /// being compiled throws.
+    private String adaptedType(TypeElement type) {
+        for (AnnotationMirror mirror : type.getAnnotationMirrors()) {
+            if (!mirror.getAnnotationType().toString().equals("fr.gocraft.api.ValueAdapter")) {
+                continue;
+            }
+            for (Map.Entry<? extends ExecutableElement, ? extends AnnotationValue> entry
+                    : mirror.getElementValues().entrySet()) {
+                if (entry.getKey().getSimpleName().contentEquals("value")) {
+                    return erasureOf(entry.getValue().getValue().toString());
+                }
+            }
+        }
+        return null;
+    }
+
+    private ExecutableElement staticMethod(TypeElement type, String name) {
+        for (Element member : type.getEnclosedElements()) {
+            if (member.getKind() != ElementKind.METHOD
+                    || !member.getSimpleName().contentEquals(name)
+                    || !member.getModifiers().contains(Modifier.STATIC)
+                    || !member.getModifiers().contains(Modifier.PUBLIC)) {
+                continue;
+            }
+            ExecutableElement method = (ExecutableElement) member;
+            if (method.getParameters().size() == 1) {
+                return method;
+            }
+        }
+        return null;
+    }
+
+    /// What an adapter is allowed to encode to: a scalar or a record, never
+    /// another adapted type.
+    private Carried simpleWireCarriedBy(String declared) {
+        Kind boxed = Kind.boxed(declared);
+        if (boxed != null) {
+            return new Carried.Scalar(boxed, declared);
+        }
+        Kind kind = Kind.of(declared);
+        if (kind != null) {
+            return new Carried.Scalar(kind, declared);
+        }
+        TypeElement type = processingEnv.getElementUtils().getTypeElement(declared);
+        if (type == null || type.getAnnotation(EventValue.class) == null) {
+            return null;
+        }
+        EventValue value = type.getAnnotation(EventValue.class);
+        String name = value.value().isBlank() ? declared : value.value();
+        return new Carried.Compound(name, declared, declared + "Values");
+    }
+
+    private static String erasureOf(String declared) {
+        int generic = declared.indexOf('<');
+        return generic < 0 ? declared : declared.substring(0, generic);
     }
 
     private void declare(TypeElement type, Diagnostics diagnostics) {
@@ -490,6 +630,10 @@ public final class EventProcessor extends AbstractProcessor {
     }
 
     private Carried simpleCarriedBy(String declared) {
+        Carried.Adapted adapted = adapters.get(declared);
+        if (adapted != null) {
+            return adapted;
+        }
         Kind kind = Kind.of(declared);
         if (kind != null) {
             return new Carried.Scalar(kind, declared);

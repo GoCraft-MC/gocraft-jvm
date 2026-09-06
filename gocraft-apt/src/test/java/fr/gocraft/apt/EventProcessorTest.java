@@ -315,6 +315,89 @@ class EventProcessorTest {
         assertFalse(result.firstError().isBlank(), "a map of maps was accepted");
     }
 
+    /// §10's third case: data you cannot annotate. A ZonedDateTime is the JDK's
+    /// and an author cannot put @EventValue on it, so an adapter says what it
+    /// looks like on the wire — and the signature of encode *is* that answer.
+    ///
+    /// The manifest then says `int`, so a subscriber in Lua or Go sees an
+    /// ordinary number and needs to know nothing about time zones. That is what
+    /// keeps the vocabulary the manifest can express closed.
+    private static final String ADAPTED = """
+            import fr.gocraft.api.PluginEvent;
+            import fr.gocraft.api.ValueAdapter;
+            import java.time.Instant;
+            import java.time.ZoneOffset;
+            import java.time.ZonedDateTime;
+
+            @ValueAdapter(ZonedDateTime.class)
+            final class TimestampAdapter {
+                public static long encode(ZonedDateTime value) {
+                    return value.toInstant().toEpochMilli();
+                }
+
+                public static ZonedDateTime decode(long wire) {
+                    return Instant.ofEpochMilli(wire).atZone(ZoneOffset.UTC);
+                }
+            }
+
+            @PluginEvent("fr.oreo.shop/receipt")
+            public final class ReceiptEvent {
+                private final ZonedDateTime at;
+
+                public ReceiptEvent(ZonedDateTime at) { this.at = at; }
+
+                public ZonedDateTime at() { return at; }
+            }
+            """;
+
+    @Test
+    void carriesATypeItCannotAnnotate() throws IOException {
+        String codec = Javac.compile("ReceiptEvent", ADAPTED, PROCESSOR)
+                .source("ReceiptEventLayout");
+        assertTrue(codec.contains("TimestampAdapter.encode(target.at())"), codec);
+        assertTrue(codec.contains("TimestampAdapter.decode("), codec);
+        // What crosses is a long, so the payload the codec builds is a Value.Int
+        // and the manifest will say int — the whole point of the annotation.
+        assertTrue(codec.contains("new Value.Int("), codec);
+        assertFalse(codec.contains("ZonedDateTimeValues"), codec);
+    }
+
+    /// An adapter that encodes to something the wire does not carry has not
+    /// answered the question it exists to answer. Refused by name, because the
+    /// alternative is a generated codec that will not compile and a message
+    /// about a file the author never opened.
+    @Test
+    void refusesAnAdapterToAnUnknownShape() throws IOException {
+        Javac.Result result = Javac.compile("Receipt", """
+                import fr.gocraft.api.ValueAdapter;
+                import java.time.ZonedDateTime;
+
+                @ValueAdapter(ZonedDateTime.class)
+                public final class Receipt {
+                    public static Thread encode(ZonedDateTime value) { return null; }
+                    public static ZonedDateTime decode(Thread wire) { return null; }
+                }
+                """, PROCESSOR);
+        assertTrue(result.firstError().contains("which the wire does not carry"),
+                result.firstError());
+    }
+
+    /// The two methods have to meet, or the round trip does not.
+    @Test
+    void refusesAnAdapterThatDoesNotRoundTrip() throws IOException {
+        Javac.Result result = Javac.compile("Receipt", """
+                import fr.gocraft.api.ValueAdapter;
+                import java.time.ZonedDateTime;
+
+                @ValueAdapter(ZonedDateTime.class)
+                public final class Receipt {
+                    public static long encode(ZonedDateTime value) { return 0; }
+                    public static ZonedDateTime decode(String wire) { return null; }
+                }
+                """, PROCESSOR);
+        assertTrue(result.firstError().contains("have to meet"), result.firstError());
+    }
+
     /// The wire is a finite positional payload with no pointers, so a record
     /// reaching itself is not a shape that could be encoded at all.
     @Test

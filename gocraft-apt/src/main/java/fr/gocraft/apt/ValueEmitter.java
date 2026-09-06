@@ -34,6 +34,11 @@ abstract class ValueEmitter {
             case Carried.Scalar scalar -> "new Value." + scalar.kind().record + "(" + source + ")";
             case Carried.Player ignored -> source + ".value()";
             case Carried.Compound compound -> compound.codec() + ".encode(" + source + ")";
+            // Through the author's adapter and then through the wire type it
+            // named: the adapter answers what this looks like, and the rest is
+            // the ordinary path for whatever it answered.
+            case Carried.Adapted adapted ->
+                    encodeValue(adapted.wire(), adapted.adapter() + ".encode(" + source + ")");
             case Carried.Listed ignored ->
                     throw new IllegalStateException("a list is written by encodeList");
             case Carried.Keyed ignored ->
@@ -133,6 +138,12 @@ abstract class ValueEmitter {
                     + " = fr.gocraft.api.PlayerRef.of(" + value + ", sink);");
             case Carried.Compound compound -> line(depth, compound.java() + " " + target
                     + " = " + compound.codec() + ".decode(" + value + ", sink);");
+            case Carried.Adapted adapted -> {
+                String wire = target + "Wire";
+                decodeValue(depth, adapted.wire(), value, wire, where);
+                line(depth, adapted.java() + " " + target + " = "
+                        + adapted.adapter() + ".decode(" + wire + ");");
+            }
             case Carried.Listed listed -> {
                 String raw = target + "Raw";
                 line(depth, "if (!(" + value + " instanceof Value.List(List<Value> " + raw

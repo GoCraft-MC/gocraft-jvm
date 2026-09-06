@@ -63,6 +63,20 @@ sealed interface Carried {
         }
     }
 
+    /// A type an author cannot annotate, carried as something the wire already
+    /// knows because a [fr.gocraft.api.ValueAdapter] said what it looks like.
+    ///
+    /// `wire` is what actually crosses and what the manifest names — so a
+    /// subscriber in another language sees an ordinary int and needs to know
+    /// nothing about a ZonedDateTime. `java` is the author's type and `adapter`
+    /// the class whose static encode/decode move between the two.
+    record Adapted(Carried wire, String java, String adapter) implements Carried {
+        @Override
+        public String manifest() {
+            return wire.manifest();
+        }
+    }
+
     /// A Map of any of the above, keyed by String and only by String.
     ///
     /// One key type rather than a choice, because the map has to survive every
