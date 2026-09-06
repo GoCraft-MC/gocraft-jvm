@@ -32,4 +32,36 @@ public interface DispatchOrBuilder extends
    * @return The event.
    */
   fr.gocraft.abi.v1.Event getEvent();
+
+  /**
+   * <pre>
+   * warm asks the runtime to run everything a dispatch runs except the
+   * handlers, and answer as it normally would.
+   *
+   * It exists because the first event of a type into an out-of-process runtime
+   * costs tens of times a warm one — measured at 7.9 ms against a 2 ms budget
+   * for a JVM, from class loading, lazily built protobuf coders and
+   * interpreted bytecode on both sides of the socket. That cost lands on the
+   * tick, and on an event whose provider declared fail_closed it cancels an
+   * action nobody refused, once per restart, invisibly.
+   *
+   * The host sends these between LOAD and READY, which it already waits for
+   * without a budget. Down the real socket rather than replicated inside a
+   * runtime: a warm-up that reimplemented the dispatch path would warm the
+   * copy, and every piece it forgot — the writer thread, the framing, the
+   * host's own first marshal — would still be cold when it mattered.
+   *
+   * The payload is empty and the runtime supplies one of its own shape. It
+   * already has to know the layout to decode a real event, so sending a blank
+   * would be describing the shape twice.
+   *
+   * A runtime that has nothing to warm may treat this as a no-op and answer.
+   * What it must never do is run a handler: the values are placeholders, and an
+   * author's code would be deciding about a purchase nobody made.
+   * </pre>
+   *
+   * <code>bool warm = 3 [json_name = "warm"];</code>
+   * @return The warm.
+   */
+  boolean getWarm();
 }

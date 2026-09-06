@@ -118,6 +118,110 @@ public  final class Dispatch extends
     bitField0_ = (bitField0_ & ~0x00000001);
   }
 
+  public static final int WARM_FIELD_NUMBER = 3;
+  private boolean warm_;
+  /**
+   * <pre>
+   * warm asks the runtime to run everything a dispatch runs except the
+   * handlers, and answer as it normally would.
+   *
+   * It exists because the first event of a type into an out-of-process runtime
+   * costs tens of times a warm one — measured at 7.9 ms against a 2 ms budget
+   * for a JVM, from class loading, lazily built protobuf coders and
+   * interpreted bytecode on both sides of the socket. That cost lands on the
+   * tick, and on an event whose provider declared fail_closed it cancels an
+   * action nobody refused, once per restart, invisibly.
+   *
+   * The host sends these between LOAD and READY, which it already waits for
+   * without a budget. Down the real socket rather than replicated inside a
+   * runtime: a warm-up that reimplemented the dispatch path would warm the
+   * copy, and every piece it forgot — the writer thread, the framing, the
+   * host's own first marshal — would still be cold when it mattered.
+   *
+   * The payload is empty and the runtime supplies one of its own shape. It
+   * already has to know the layout to decode a real event, so sending a blank
+   * would be describing the shape twice.
+   *
+   * A runtime that has nothing to warm may treat this as a no-op and answer.
+   * What it must never do is run a handler: the values are placeholders, and an
+   * author's code would be deciding about a purchase nobody made.
+   * </pre>
+   *
+   * <code>bool warm = 3 [json_name = "warm"];</code>
+   * @return The warm.
+   */
+  @java.lang.Override
+  public boolean getWarm() {
+    return warm_;
+  }
+  /**
+   * <pre>
+   * warm asks the runtime to run everything a dispatch runs except the
+   * handlers, and answer as it normally would.
+   *
+   * It exists because the first event of a type into an out-of-process runtime
+   * costs tens of times a warm one — measured at 7.9 ms against a 2 ms budget
+   * for a JVM, from class loading, lazily built protobuf coders and
+   * interpreted bytecode on both sides of the socket. That cost lands on the
+   * tick, and on an event whose provider declared fail_closed it cancels an
+   * action nobody refused, once per restart, invisibly.
+   *
+   * The host sends these between LOAD and READY, which it already waits for
+   * without a budget. Down the real socket rather than replicated inside a
+   * runtime: a warm-up that reimplemented the dispatch path would warm the
+   * copy, and every piece it forgot — the writer thread, the framing, the
+   * host's own first marshal — would still be cold when it mattered.
+   *
+   * The payload is empty and the runtime supplies one of its own shape. It
+   * already has to know the layout to decode a real event, so sending a blank
+   * would be describing the shape twice.
+   *
+   * A runtime that has nothing to warm may treat this as a no-op and answer.
+   * What it must never do is run a handler: the values are placeholders, and an
+   * author's code would be deciding about a purchase nobody made.
+   * </pre>
+   *
+   * <code>bool warm = 3 [json_name = "warm"];</code>
+   * @param value The warm to set.
+   */
+  private void setWarm(boolean value) {
+    
+    warm_ = value;
+  }
+  /**
+   * <pre>
+   * warm asks the runtime to run everything a dispatch runs except the
+   * handlers, and answer as it normally would.
+   *
+   * It exists because the first event of a type into an out-of-process runtime
+   * costs tens of times a warm one — measured at 7.9 ms against a 2 ms budget
+   * for a JVM, from class loading, lazily built protobuf coders and
+   * interpreted bytecode on both sides of the socket. That cost lands on the
+   * tick, and on an event whose provider declared fail_closed it cancels an
+   * action nobody refused, once per restart, invisibly.
+   *
+   * The host sends these between LOAD and READY, which it already waits for
+   * without a budget. Down the real socket rather than replicated inside a
+   * runtime: a warm-up that reimplemented the dispatch path would warm the
+   * copy, and every piece it forgot — the writer thread, the framing, the
+   * host's own first marshal — would still be cold when it mattered.
+   *
+   * The payload is empty and the runtime supplies one of its own shape. It
+   * already has to know the layout to decode a real event, so sending a blank
+   * would be describing the shape twice.
+   *
+   * A runtime that has nothing to warm may treat this as a no-op and answer.
+   * What it must never do is run a handler: the values are placeholders, and an
+   * author's code would be deciding about a purchase nobody made.
+   * </pre>
+   *
+   * <code>bool warm = 3 [json_name = "warm"];</code>
+   */
+  private void clearWarm() {
+
+    warm_ = false;
+  }
+
   public static fr.gocraft.abi.v1.Dispatch parseFrom(
       java.nio.ByteBuffer data)
       throws com.google.protobuf.InvalidProtocolBufferException {
@@ -317,6 +421,112 @@ public  final class Dispatch extends
       return this;
     }
 
+    /**
+     * <pre>
+     * warm asks the runtime to run everything a dispatch runs except the
+     * handlers, and answer as it normally would.
+     *
+     * It exists because the first event of a type into an out-of-process runtime
+     * costs tens of times a warm one — measured at 7.9 ms against a 2 ms budget
+     * for a JVM, from class loading, lazily built protobuf coders and
+     * interpreted bytecode on both sides of the socket. That cost lands on the
+     * tick, and on an event whose provider declared fail_closed it cancels an
+     * action nobody refused, once per restart, invisibly.
+     *
+     * The host sends these between LOAD and READY, which it already waits for
+     * without a budget. Down the real socket rather than replicated inside a
+     * runtime: a warm-up that reimplemented the dispatch path would warm the
+     * copy, and every piece it forgot — the writer thread, the framing, the
+     * host's own first marshal — would still be cold when it mattered.
+     *
+     * The payload is empty and the runtime supplies one of its own shape. It
+     * already has to know the layout to decode a real event, so sending a blank
+     * would be describing the shape twice.
+     *
+     * A runtime that has nothing to warm may treat this as a no-op and answer.
+     * What it must never do is run a handler: the values are placeholders, and an
+     * author's code would be deciding about a purchase nobody made.
+     * </pre>
+     *
+     * <code>bool warm = 3 [json_name = "warm"];</code>
+     * @return The warm.
+     */
+    @java.lang.Override
+    public boolean getWarm() {
+      return instance.getWarm();
+    }
+    /**
+     * <pre>
+     * warm asks the runtime to run everything a dispatch runs except the
+     * handlers, and answer as it normally would.
+     *
+     * It exists because the first event of a type into an out-of-process runtime
+     * costs tens of times a warm one — measured at 7.9 ms against a 2 ms budget
+     * for a JVM, from class loading, lazily built protobuf coders and
+     * interpreted bytecode on both sides of the socket. That cost lands on the
+     * tick, and on an event whose provider declared fail_closed it cancels an
+     * action nobody refused, once per restart, invisibly.
+     *
+     * The host sends these between LOAD and READY, which it already waits for
+     * without a budget. Down the real socket rather than replicated inside a
+     * runtime: a warm-up that reimplemented the dispatch path would warm the
+     * copy, and every piece it forgot — the writer thread, the framing, the
+     * host's own first marshal — would still be cold when it mattered.
+     *
+     * The payload is empty and the runtime supplies one of its own shape. It
+     * already has to know the layout to decode a real event, so sending a blank
+     * would be describing the shape twice.
+     *
+     * A runtime that has nothing to warm may treat this as a no-op and answer.
+     * What it must never do is run a handler: the values are placeholders, and an
+     * author's code would be deciding about a purchase nobody made.
+     * </pre>
+     *
+     * <code>bool warm = 3 [json_name = "warm"];</code>
+     * @param value The warm to set.
+     * @return This builder for chaining.
+     */
+    public Builder setWarm(boolean value) {
+      copyOnWrite();
+      instance.setWarm(value);
+      return this;
+    }
+    /**
+     * <pre>
+     * warm asks the runtime to run everything a dispatch runs except the
+     * handlers, and answer as it normally would.
+     *
+     * It exists because the first event of a type into an out-of-process runtime
+     * costs tens of times a warm one — measured at 7.9 ms against a 2 ms budget
+     * for a JVM, from class loading, lazily built protobuf coders and
+     * interpreted bytecode on both sides of the socket. That cost lands on the
+     * tick, and on an event whose provider declared fail_closed it cancels an
+     * action nobody refused, once per restart, invisibly.
+     *
+     * The host sends these between LOAD and READY, which it already waits for
+     * without a budget. Down the real socket rather than replicated inside a
+     * runtime: a warm-up that reimplemented the dispatch path would warm the
+     * copy, and every piece it forgot — the writer thread, the framing, the
+     * host's own first marshal — would still be cold when it mattered.
+     *
+     * The payload is empty and the runtime supplies one of its own shape. It
+     * already has to know the layout to decode a real event, so sending a blank
+     * would be describing the shape twice.
+     *
+     * A runtime that has nothing to warm may treat this as a no-op and answer.
+     * What it must never do is run a handler: the values are placeholders, and an
+     * author's code would be deciding about a purchase nobody made.
+     * </pre>
+     *
+     * <code>bool warm = 3 [json_name = "warm"];</code>
+     * @return This builder for chaining.
+     */
+    public Builder clearWarm() {
+      copyOnWrite();
+      instance.clearWarm();
+      return this;
+    }
+
     // @@protoc_insertion_point(builder_scope:gocraft.abi.v1.Dispatch)
   }
   @java.lang.Override
@@ -336,10 +546,11 @@ public  final class Dispatch extends
             "bitField0_",
             "pluginId_",
             "event_",
+            "warm_",
           };
           java.lang.String info =
-              "\u0000\u0002\u0000\u0001\u0001\u0002\u0002\u0000\u0000\u0000\u0001\u0208\u0002\u1009" +
-              "\u0000";
+              "\u0000\u0003\u0000\u0001\u0001\u0003\u0003\u0000\u0000\u0000\u0001\u0208\u0002\u1009" +
+              "\u0000\u0003\u0007";
           return newMessageInfo(DEFAULT_INSTANCE, info, objects);
       }
       case GET_DEFAULT_INSTANCE: {
