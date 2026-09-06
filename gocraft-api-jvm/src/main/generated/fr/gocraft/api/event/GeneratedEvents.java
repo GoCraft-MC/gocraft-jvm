@@ -28,6 +28,17 @@ public final class GeneratedEvents {
                     Map.entry(PlayerJoinEvent.TYPE, PlayerJoinEvent::new)
             );
 
+    /// The same table, for the decode path rather than the dispatch.
+    ///
+    /// A runtime warms only the types some plugin subscribed to, so this is
+    /// looked up by name like BY_TYPE rather than walked whole: a server with
+    /// one listener must not pay for every event in the ABI.
+    private static final Map<String, java.util.function.Consumer<EffectSink>> WARM =
+            Map.ofEntries(
+                    Map.entry(BlockBreakEvent.TYPE, BlockBreakEvent::warm),
+                    Map.entry(PlayerJoinEvent.TYPE, PlayerJoinEvent::warm)
+            );
+
     private static final Map<Class<? extends Event>, String> BY_CLASS = Map.ofEntries(
             Map.entry(BlockBreakEvent.class, BlockBreakEvent.TYPE),
             Map.entry(PlayerJoinEvent.class, PlayerJoinEvent.TYPE)
@@ -51,6 +62,18 @@ public final class GeneratedEvents {
 
     public static boolean knows(String type) {
         return BY_TYPE.containsKey(type);
+    }
+
+    /// Runs one event's decode path once, before any tick waits on it.
+    ///
+    /// Silent for a type this runtime does not have: a plugin subscribing to
+    /// something newer than the ABI it was loaded into is refused at preflight,
+    /// and a warm-up is the wrong place to say so a second time.
+    public static void warm(String type, EffectSink sink) {
+        java.util.function.Consumer<EffectSink> warming = WARM.get(type);
+        if (warming != null) {
+            warming.accept(sink);
+        }
     }
 
     /// Whether a subscriber may refuse this event.
