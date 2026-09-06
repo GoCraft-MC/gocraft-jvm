@@ -79,9 +79,10 @@ final class PluginRegistry implements AutoCloseable {
                     request.getDataDirectory(), request.getCommandTree(),
                     EventBindings.of(request.getEventTypesList()), emitter);
             plugins.put(id, loaded);
-            // Before the reply, so the host cannot dispatch into a cold runtime
-            // between the two. It is waiting for this LOAD anyway, and it waits
-            // without a budget.
+            // The reflective call, which is all this side warms on its own:
+            // everything else arrives as a warm DISPATCH once every plugin is
+            // loaded. Before the reply because the host waits for it anyway,
+            // and it waits without a budget.
             Warmup.run();
             // What the plugin actually registered. The host checks it against
             // the manifest it validated and refuses anything undeclared, which
@@ -125,6 +126,9 @@ final class PluginRegistry implements AutoCloseable {
             return allow(seq);
         }
         String type = request.getEvent().getType();
+        if (request.getWarm()) {
+            return warm(seq, loaded, type);
+        }
         var fields = EventCodec.fields(request.getEvent().getFieldsList());
         Subscriptions.ProblemReporter problems = (handler, thrown) ->
                 System.err.println("gocraft-runtime: " + pluginId + " handler " + handler
@@ -179,6 +183,49 @@ final class PluginRegistry implements AutoCloseable {
         loaded.subscriptions().dispatch(type, event, control, problems);
         return Envelopes.verdict(seq, EventCodec.verdict(control,
                 EventCodec.changes(fields, codec.fields(event))));
+    }
+
+    /// Runs one subscription's dispatch path without reaching its handlers.
+    ///
+    /// The host sends these between LOAD and READY, where it waits without a
+    /// budget, so the first real event of a type does not pay for a cold JVM
+    /// out of the budget it shares with every other subscriber. It arrives as
+    /// an ordinary DISPATCH down the ordinary socket, which is the point: a
+    /// runtime that warmed itself would warm a copy of this path, and whatever
+    /// the copy left out — the reader loop, the writer thread, the framing,
+    /// protobuf on either side — would still be cold when the tick was waiting.
+    ///
+    /// The payload comes from here rather than from the host. A codec has to
+    /// know the layout to read a real event, so asking it for one of its own
+    /// shape is cheaper than a wire format that describes the shape twice.
+    ///
+    /// **No handler runs.** The values are placeholders and an author's code
+    /// would be deciding about a purchase nobody made — the one line this
+    /// class does not cross, in a runtime that otherwise warms everything it
+    /// executes itself.
+    private Envelope warm(long seq, LoadedPlugin loaded, String type) {
+        Control control = new Control();
+        try {
+            CustomEvent codec = loaded.subscriptions().codecFor(type);
+            if (codec == null) {
+                GeneratedEvents.warm(type, control);
+            } else {
+                List<fr.gocraft.api.Value> blank = codec.blank();
+                Object event = codec.create(blank, control);
+                // Both directions, because a dispatch runs both: the object is
+                // read back to work out what the handlers changed, and written
+                // to when the mutations come home.
+                EventCodec.changes(blank, codec.fields(event));
+                codec.setFields(event, blank);
+            }
+        } catch (RuntimeException | Error ignored) {
+            // A warm-up that failed has cost the load nothing, and reporting it
+            // would be reporting an optimisation. The first real event will say
+            // the same thing with a payload someone sent.
+        }
+        // Answered like any dispatch, so the reply path warms too — and so the
+        // host knows the round finished rather than guessing at a delay.
+        return Envelopes.verdict(seq, EventCodec.verdict(control, List.of()));
     }
 
     /// Runs one command in one plugin and answers.

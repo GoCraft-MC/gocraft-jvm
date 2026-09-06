@@ -1,108 +1,91 @@
 package fr.gocraft.runtime;
 
-import fr.gocraft.api.Value;
-
 import java.lang.reflect.Method;
-import java.util.List;
 
-/// Runs the dispatch machinery once, at load, so the first real event does not
-/// pay for it.
+/// Warms the one part of a dispatch the host's warm-up cannot reach.
 ///
-/// The event budget is a couple of milliseconds and shared by every subscriber.
-/// A first dispatch into a cold JVM does not fit: it pays the first virtual
-/// thread, the first pass of the JIT over the whole path, and the first
-/// conversion of every value shape. Every dispatch after it does fit, which is
-/// exactly what makes the first one worth removing rather than tolerating.
+/// Everything else is warmed by a real DISPATCH the host sends between LOAD and
+/// READY, marked `warm` on the wire: the reader loop, the codecs, the event
+/// class, the writer thread, protobuf on both sides. That is deliberately not
+/// replicated here — this class used to do exactly that, and every piece the
+/// replica forgot stayed cold on the path that mattered. The measurements are
+/// in [PluginRegistry#warm].
 ///
-/// The cost of not doing this is not the warning in the log. An event whose
-/// provider declared `fail_closed` is **cancelled** when its budget runs out —
-/// so a protection plugin would refuse the first action after every restart,
-/// once, invisibly. That is the failure this exists to prevent.
+/// What a warm dispatch stops short of is the handler, because the values are
+/// placeholders and an author's code must not decide about a purchase nobody
+/// made. But a handler is reached *through* [Method#invoke], and that call is
+/// not the author's — it is this runtime's, and it can be warmed on a method of
+/// this class that does nothing.
 ///
-/// **No plugin code runs here.** Invoking a handler would mean running an
-/// author's code against values nobody sent: a discount applied to a purchase
-/// that never happened, a protection decision about a block nobody broke. So
-/// what is warmed is the machinery every dispatch shares and nothing that
-/// belongs to a plugin.
+/// It has to be warmed on the right shape. Reflection reaches a method through
+/// machinery specialised per signature, so warming a static method taking
+/// nothing — which is what this class used to do — warms a path no handler ever
+/// takes. A handler is an instance method taking the event, and an EventControl
+/// beside it when it cancels.
 ///
-/// Which leaves the author's own codec cold, and there is no way around that
-/// today: exercising it needs a payload of the right shape, and the runtime is
-/// told an event's name and id but never its layout. Sending the layout with
-/// the binding would close it — the same addition that would let a subscriber
-/// notice its copy has diverged — and is worth doing when either need is real.
+/// Worth its keep, measured rather than assumed. Three runs of the reference
+/// plugin's `block.break` handler — the one that writes nothing, so the reading
+/// is the dispatch and not an author's I/O — with the host's own warm-up on in
+/// both columns:
+///
+///     without this class   1.92 ms   2.75 ms   2.30 ms
+///     with it              0.51 ms   1.07 ms   1.31 ms
+///
+/// About 1.2 ms, which is the difference between fitting in the shared 2 ms
+/// budget and not. Delete this and the first block a player breaks after every
+/// restart is decided by the budget rather than by the plugin.
+///
+/// Best effort throughout, and once per process: the shapes are this class's
+/// own, so a second plugin would pay again and warm nothing.
 final class Warmup {
+
+    /// How many times each shape is called.
+    ///
+    /// Once is not a warm-up. A single pass sets up the machinery behind a
+    /// reflective call, but the call stays interpreted until HotSpot has been
+    /// through it a few hundred times, and it was crossing that threshold —
+    /// not touching the path — that moved the first dispatch of `block.break`
+    /// from 2.07 ms to 0.51 ms.
+    private static final int ROUNDS = 2000;
+
+    private static final java.util.concurrent.atomic.AtomicBoolean DONE =
+            new java.util.concurrent.atomic.AtomicBoolean();
 
     private Warmup() {
     }
 
-    /// What the reflective warm-up calls. Doing nothing is the point: what is
-    /// being warmed is the path to it.
-    private static void nothing() {
+    /// A stand-in with a handler's shape. Neither method does anything: what is
+    /// being warmed is the reflective call, not what it reaches.
+    private static final class Shape {
+
+        void one(Object event) {
+        }
+
+        void two(Object event, Object control) {
+        }
     }
 
-    /// A payload with one of every shape, so no conversion meets its first
-    /// value while the tick is waiting.
-    private static final List<Value> SHAPES = List.of(
-            new Value.Bool(true),
-            new Value.Int(1),
-            new Value.Decimal(1),
-            new Value.Text("warm"),
-            new Value.Bytes(new byte[16]),
-            new Value.List(List.of(new Value.Text("warm"), new Value.Decimal(1))));
-
-    /// Runs on the thread that loaded the plugin, which is the read loop and
+    /// Runs on the thread that loaded the plugin, which is the reader loop and
     /// not the tick: the host is waiting for a LOAD reply either way, and it
     /// waits for that without a budget.
-    ///
-    /// Best effort throughout. A warm-up that failed has cost a load nothing,
-    /// and reporting it would be reporting an optimisation.
-    private static final java.util.concurrent.atomic.AtomicBoolean DONE =
-            new java.util.concurrent.atomic.AtomicBoolean();
-
     static void run() {
-        // Once per process, not once per plugin. Everything below is static,
-        // shared machinery: a second plugin in the same runtime would pay for
-        // it again and warm nothing.
         if (!DONE.compareAndSet(false, true)) {
             return;
         }
         try {
-            Control control = new Control();
-            List<fr.gocraft.abi.v1.Value> wire = EventCodec.wire(SHAPES);
-            List<Value> back = EventCodec.fields(wire);
-            EventCodec.changes(SHAPES, back);
-            // Through a handle, which is where a verb lives: this warms the
-            // player it is asked of as well as the queue it lands in.
-            control.player(new byte[16]).sendMessage("warm");
-            EventCodec.verdict(control, List.of());
-
-            // A handle read the way a payload carries one, which is not the way
-            // the control builds one: PlayerRef.of parses the list shape, and
-            // every event carrying a player goes through it.
-            fr.gocraft.api.PlayerRef.of(new Value.List(List.of(
-                    new Value.Bytes(new byte[16]),
-                    new Value.Text("warm"),
-                    new Value.Text("java"))), control);
-
-            // The first reflective call is the expensive one: the JVM spins up
-            // the machinery behind Method.invoke once, and every handler is
-            // reached through it. Warmed on a method of this class, because
-            // calling a plugin's would mean running an author's code against
-            // values nobody sent.
-            Method noop = Warmup.class.getDeclaredMethod("nothing");
-            noop.setAccessible(true);
-            for (int round = 0; round < 8; round++) {
-                noop.invoke(null);
+            Shape shape = new Shape();
+            Method one = Shape.class.getDeclaredMethod("one", Object.class);
+            Method two = Shape.class.getDeclaredMethod("two", Object.class, Object.class);
+            one.setAccessible(true);
+            two.setAccessible(true);
+            for (int round = 0; round < ROUNDS; round++) {
+                one.invoke(shape, shape);
+                two.invoke(shape, shape, shape);
             }
-
-            // The first virtual thread costs more than the ones after it, and
-            // every dispatch is given one.
-            Thread thread = Thread.ofVirtual().start(() -> EventCodec.wire(SHAPES));
-            thread.join();
-        } catch (InterruptedException interrupted) {
-            Thread.currentThread().interrupt();
         } catch (ReflectiveOperationException | RuntimeException ignored) {
-            // Nothing here is load-bearing.
+            // Nothing here is load-bearing. A warm-up that failed has cost the
+            // load nothing, and reporting it would be reporting an
+            // optimisation.
         }
     }
 }
