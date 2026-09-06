@@ -353,6 +353,11 @@ class DispatchTest {
                         }
                         return new PurchaseEvent(player, price);
                     }
+
+                    @Override
+                    public List<Value> blank() {
+                        return List.of(new Value.Text(""), new Value.Decimal(0));
+                    }
                 }
 
                 public static final class Listener {
