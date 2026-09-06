@@ -105,6 +105,45 @@ abstract class ValueEmitter {
         }
     }
 
+    // ── A value of the right shape, carrying nothing ──────────────────────────
+
+    /// One placeholder value of this shape, as an expression.
+    ///
+    /// This is what lets a codec be warmed at load. The runtime walks its own
+    /// dispatch path once before the tick ever waits on it, and the path only
+    /// warms if the values it meets are shaped like the real ones: a decoder
+    /// handed the wrong kind takes its refusal branch and leaves the branch that
+    /// matters interpreted and cold.
+    ///
+    /// Shape, never content. Nothing generated here is a plausible value — an
+    /// empty name, a zero price, a player who is nobody — because a warm-up that
+    /// looked like real data is one misplaced call away from being read as some.
+    protected String blankValue(Carried carried) {
+        return switch (carried) {
+            case Carried.Scalar scalar ->
+                    "new Value." + scalar.kind().record + "(" + blankScalar(scalar.kind()) + ")";
+            // Sixteen bytes and two strings: the shape PlayerRef.of parses, so
+            // the decode runs instead of falling through to NONE.
+            case Carried.Player ignored -> "new Value.List(List.of("
+                    + "new Value.Bytes(new byte[16]), new Value.Text(\"\"), new Value.Text(\"\")))";
+            case Carried.Compound compound -> compound.codec() + ".blank()";
+            // Exactly one element, so the loop around it runs a round rather
+            // than being skipped — which is the whole cost being warmed.
+            case Carried.Listed listed ->
+                    "new Value.List(List.of(" + blankValue(listed.element()) + "))";
+        };
+    }
+
+    private static String blankScalar(EventProcessor.Kind kind) {
+        return switch (kind) {
+            case BOOL -> "false";
+            case INT -> "0";
+            case DECIMAL -> "0";
+            case TEXT -> "\"\"";
+            case BYTES -> "new byte[0]";
+        };
+    }
+
     /// The type the Value record hands back, which is not always the field's.
     protected static String carriedType(EventProcessor.Kind kind) {
         return switch (kind) {
