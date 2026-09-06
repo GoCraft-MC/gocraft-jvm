@@ -54,32 +54,4 @@ public final class BlockBreakEvent extends fr.gocraft.api.Event {
         return permission(node);
     }
 
-    /// Runs this event's own decode once, on a payload of its shape carrying
-    /// nothing.
-    ///
-    /// The first dispatch of a type into a cold runtime costs tens of times a
-    /// warm one — the class loaded, the call sites linked, one interpreted pass
-    /// — and the §06 budget it spends belongs to the event rather than to the
-    /// subscriber that happened to be first. Paid here instead, on the load
-    /// path, which the host waits for without a budget.
-    ///
-    /// The payload is shaped and empty: every reader below refuses a kind it
-    /// does not expect and falls back, so a payload of the wrong shape would
-    /// warm the fallback and leave the branch that matters cold.
-    ///
-    /// Nothing an author wrote runs here. This is the generated decode and
-    /// nothing past it.
-    public static void warm(fr.gocraft.api.EffectSink sink) {
-        BlockBreakEvent warming = new BlockBreakEvent(java.util.List.of(
-                new fr.gocraft.api.Value.List(java.util.List.of(new fr.gocraft.api.Value.Bytes(new byte[16]), new fr.gocraft.api.Value.Text(""), new fr.gocraft.api.Value.Text(""))),
-                new fr.gocraft.api.Value.List(java.util.List.of(new fr.gocraft.api.Value.Int(0), new fr.gocraft.api.Value.Int(0), new fr.gocraft.api.Value.Int(0))),
-                new fr.gocraft.api.Value.List(java.util.List.of(new fr.gocraft.api.Value.Text(""), new fr.gocraft.api.Value.List(java.util.List.of()))),
-                new fr.gocraft.api.Value.Text(""),
-                new fr.gocraft.api.Value.List(java.util.List.of(new fr.gocraft.api.Value.List(java.util.List.of(new fr.gocraft.api.Value.Text(""), new fr.gocraft.api.Value.Bool(false)))))), sink);
-        warming.player();
-        warming.pos();
-        warming.block();
-        warming.tool();
-        warming.can("");
-    }
 }
