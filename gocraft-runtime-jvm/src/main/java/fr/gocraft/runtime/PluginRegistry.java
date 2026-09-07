@@ -152,10 +152,14 @@ final class PluginRegistry implements AutoCloseable {
     /// rather than a handler reading somebody else's price.
     ///
     /// What the handlers changed is worked out by comparing the object
-    /// afterwards. Effects are not collected: the author's class is an ordinary
-    /// one and has nowhere to record them, which is a gap rather than a
-    /// decision — a subscriber to a plugin-defined event cannot yet message a
-    /// player.
+    /// afterwards, which is what an ordinary class with no framework in it
+    /// allows: it has nowhere to record a write, so nobody asks it to.
+    ///
+    /// Effects are collected all the same. The control is handed to the codec
+    /// as the [fr.gocraft.api.EffectSink] the payload's handles bind to, so a
+    /// PlayerRef the event carries is somebody this subscriber can answer, and
+    /// anyone else is reachable through [fr.gocraft.api.EventControl#player].
+    /// They leave with the verdict like a native event's do.
     private Envelope dispatchCustom(long seq, String pluginId, LoadedPlugin loaded, String type,
             List<fr.gocraft.api.Value> fields, Control control,
             Subscriptions.ProblemReporter problems) {
