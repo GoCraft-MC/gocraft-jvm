@@ -33,7 +33,7 @@ public abstract class Event {
     protected Event(String type, List<Value> fields, Map<String, Boolean> permissions,
             EffectSink sink) {
         this.type = type;
-        this.fields = List.copyOf(fields);
+        this.fields = new java.util.ArrayList<>(fields);
         this.permissions = Map.copyOf(permissions);
         this.sink = sink;
     }
@@ -50,6 +50,16 @@ public abstract class Event {
 
     protected final Value field(int index) {
         return index >= 0 && index < fields.size() ? fields.get(index) : null;
+    }
+
+    /// Only schema-generated mutable accessors call this setter.
+    protected final void field(int index, Value value) {
+        fields.set(index, java.util.Objects.requireNonNull(value));
+    }
+
+    /// Runtime snapshot used to return native mutations over the existing IPC.
+    public final List<Value> snapshotFields() {
+        return List.copyOf(fields);
     }
 
     protected final String text(int index) {
