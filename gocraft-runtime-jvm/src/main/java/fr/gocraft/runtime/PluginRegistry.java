@@ -218,6 +218,7 @@ final class PluginRegistry implements AutoCloseable {
             Event event = GeneratedEvents.create(type, fields, control);
             if (event != null) {
                 EventCodec.changes(fields, event.snapshotFields());
+                EventCodec.warmMutationEncoding();
             } else {
                 CustomEvent codec = loaded.subscriptions().codecFor(type);
                 if (codec != null) {
