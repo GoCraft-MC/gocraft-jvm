@@ -20,6 +20,15 @@ final class EventCodec {
     private EventCodec() {
     }
 
+    // An unchanged shaped event never constructs a Mutation or serializes its
+    // value. Exercise that infrastructure locally, without calling a handler
+    // or returning synthetic changes/effects to the server.
+    static void warmMutationEncoding() {
+        var before = List.<fr.gocraft.api.Value>of(new fr.gocraft.api.Value.Text(""), new fr.gocraft.api.Value.Decimal(0));
+        var after = List.<fr.gocraft.api.Value>of(new fr.gocraft.api.Value.Text("warm"), new fr.gocraft.api.Value.Decimal(1));
+        verdict(new Control(), changes(before, after)).toByteArray();
+    }
+
     static List<fr.gocraft.api.Value> fields(List<Value> wire) {
         List<fr.gocraft.api.Value> read = new ArrayList<>(wire.size());
         for (Value value : wire) {
