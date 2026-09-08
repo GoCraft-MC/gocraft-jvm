@@ -44,7 +44,10 @@ class NativeMutationTest {
                     .addFields(text("original"))
                     .addFields(Value.newBuilder().setListValue(ValueList.getDefaultInstance())).build();
             Dispatch request = Dispatch.newBuilder().setPluginId("test.chat").setEvent(event).build();
-            assertFalse(registry.dispatch(2, request.toBuilder().setWarm(true).build()).getVerdict().getCancelled());
+            Verdict warmed = registry.dispatch(2, request.toBuilder().setWarm(true).build()).getVerdict();
+            assertFalse(warmed.getCancelled());
+            assertEquals(0, warmed.getMutationsCount());
+            assertEquals(0, warmed.getEffectsCount());
             // Serialize the reply again: the assertion is against real wire values.
             Verdict reply = Envelope.parseFrom(registry.dispatch(3, request).toByteArray()).getVerdict();
             assertTrue(reply.getCancelled());
