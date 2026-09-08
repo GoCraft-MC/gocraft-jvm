@@ -138,7 +138,8 @@ final class PluginRegistry implements AutoCloseable {
         Event event = GeneratedEvents.create(type, fields, control);
         if (event != null) {
             loaded.subscriptions().dispatch(type, event, control, problems);
-            return Envelopes.verdict(seq, EventCodec.verdict(control, List.of()));
+            return Envelopes.verdict(seq, EventCodec.verdict(control,
+                    EventCodec.changes(fields, event.snapshotFields())));
         }
         return dispatchCustom(seq, pluginId, loaded, type, fields, control, problems);
     }
@@ -215,7 +216,9 @@ final class PluginRegistry implements AutoCloseable {
             List<fr.gocraft.api.Value> fields =
                     EventCodec.fields(request.getEvent().getFieldsList());
             Event event = GeneratedEvents.create(type, fields, control);
-            if (event == null) {
+            if (event != null) {
+                EventCodec.changes(fields, event.snapshotFields());
+            } else {
                 CustomEvent codec = loaded.subscriptions().codecFor(type);
                 if (codec != null) {
                     Object custom = codec.create(fields, control);
