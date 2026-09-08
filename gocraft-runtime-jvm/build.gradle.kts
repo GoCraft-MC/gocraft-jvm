@@ -78,7 +78,7 @@ fun fingerprint(): String {
     val digest = MessageDigest.getInstance("SHA-256")
     for (name in abiSources) {
         digest.update(name.toByteArray())
-        digest.update(schemaDirectory.resolve(name).readBytes())
+        digest.update(schemaDirectory.resolve(name).readText().replace("\r\n", "\n").toByteArray(Charsets.UTF_8))
     }
     return digest.digest().joinToString("") { "%02x".format(it) }
 }
