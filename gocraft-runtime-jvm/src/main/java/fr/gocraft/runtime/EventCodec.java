@@ -5,7 +5,6 @@ import fr.gocraft.abi.v1.Mutation;
 import fr.gocraft.abi.v1.Value;
 import fr.gocraft.abi.v1.ValueList;
 import fr.gocraft.abi.v1.Verdict;
-import fr.gocraft.api.Event;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -47,15 +46,20 @@ final class EventCodec {
         };
     }
 
-    /// Builds the answer: what the handlers decided, and everything they asked
-    /// for, in one message.
+    /// Everything a dispatch decided, from the one place it accumulated.
     ///
-    /// Effects are batched rather than sent as they happen, which is what keeps
-    /// one event to one round trip however much a handler does. Mutations are
-    /// not produced yet — nothing in the API offers them.
-    static Verdict verdict(Event event) {
-        Verdict.Builder verdict = Verdict.newBuilder().setCancelled(event.cancelled());
-        for (Event.Effect effect : event.effects()) {
+    /// Effects are batched rather than sent as they happen, which keeps one
+    /// event to one round trip however much a handler does.
+    ///
+    /// The control is both the verdict channel and the sink every handle in the
+    /// payload was bound to, so there is nothing to merge: a message asked of a
+    /// player and a cancellation asked of the control arrive here together, in
+    /// the order the handlers asked for them.
+    static Verdict verdict(Control control, List<Mutation> mutations) {
+        Verdict.Builder verdict = Verdict.newBuilder()
+                .setCancelled(control.cancelled())
+                .addAllMutations(mutations);
+        for (Control.Effect effect : control.seal()) {
             verdict.addEffects(HostCall.newBuilder()
                     .setType(effect.call())
                     .addAllFields(wire(effect.values()))
@@ -87,9 +91,85 @@ final class EventCodec {
         return builder.build();
     }
 
-    /// Mutations exist in the schema and nothing produces one yet. Kept named so
-    /// the day something does, it is obvious where it belongs.
-    static List<Mutation> mutations() {
-        return List.of();
+    /// What the handlers changed on a plugin-defined event, as a positional
+    /// diff.
+    ///
+    /// Compared rather than recorded, because on this side the handler holds
+    /// its own typed object and writes through its own setters: there is
+    /// nowhere to hook a recorder without making an author call one. The Go SDK
+    /// records instead, since a subscriber there works positionally already —
+    /// the wire carries the same mutations either way, and how they were
+    /// produced is each runtime's own business.
+    ///
+    /// As deep as the change went, which is not a refinement but a requirement.
+    /// The host authorises a write by the depth of its path — MutablePath
+    /// answers a length-one path from the field's own mutability and anything
+    /// deeper from the field existing at all — so emitting a whole-field
+    /// mutation for a record changed inside an immutable list gets it refused,
+    /// while the same author code running on the Go side, which walks in, gets
+    /// it applied. The rule belongs to the contract; abi.Diff states it, and
+    /// this is its second reading.
+    ///
+    /// A byte[] is compared by content, at any depth. Value.Bytes is a record,
+    /// so its equals is the array's — identity — and that reaches further than
+    /// it looks: a PlayerRef travels as a list whose first element is one, so a
+    /// field nobody touched was reported as changed on every single dispatch,
+    /// and the host logged a write to a read-only field for it.
+    static List<Mutation> changes(List<fr.gocraft.api.Value> before,
+            List<fr.gocraft.api.Value> after) {
+        List<Mutation> mutations = new ArrayList<>();
+        changesInto(mutations, List.of(), before, after);
+        return mutations;
+    }
+
+    private static void changesInto(List<Mutation> mutations, List<Integer> path,
+            List<fr.gocraft.api.Value> before, List<fr.gocraft.api.Value> after) {
+        if (before.size() != after.size()) {
+            return;
+        }
+        for (int index = 0; index < before.size(); index++) {
+            fr.gocraft.api.Value left = before.get(index);
+            fr.gocraft.api.Value right = after.get(index);
+            // Lists first, and without asking same(): it would walk the
+            // children to answer and the recursion walks them again.
+            if (left instanceof fr.gocraft.api.Value.List(List<fr.gocraft.api.Value> from)
+                    && right instanceof fr.gocraft.api.Value.List(List<fr.gocraft.api.Value> to)
+                    && from.size() == to.size()) {
+                List<Integer> deeper = new ArrayList<>(path);
+                deeper.add(index);
+                changesInto(mutations, deeper, from, to);
+                continue;
+            }
+            if (same(left, right)) {
+                continue;
+            }
+            Mutation.Builder mutation = Mutation.newBuilder();
+            for (Integer step : path) {
+                mutation.addPath(step);
+            }
+            mutations.add(mutation.addPath(index).setValue(wire(right)).build());
+        }
+    }
+
+    private static boolean same(fr.gocraft.api.Value before, fr.gocraft.api.Value after) {
+        if (before instanceof fr.gocraft.api.Value.Bytes(byte[] left)
+                && after instanceof fr.gocraft.api.Value.Bytes(byte[] right)) {
+            return java.util.Arrays.equals(left, right);
+        }
+        // Recursive, because a record and a PlayerRef both travel as lists and
+        // either may hold bytes somewhere inside.
+        if (before instanceof fr.gocraft.api.Value.List(List<fr.gocraft.api.Value> left)
+                && after instanceof fr.gocraft.api.Value.List(List<fr.gocraft.api.Value> right)) {
+            if (left.size() != right.size()) {
+                return false;
+            }
+            for (int index = 0; index < left.size(); index++) {
+                if (!same(left.get(index), right.get(index))) {
+                    return false;
+                }
+            }
+            return true;
+        }
+        return before.equals(after);
     }
 }

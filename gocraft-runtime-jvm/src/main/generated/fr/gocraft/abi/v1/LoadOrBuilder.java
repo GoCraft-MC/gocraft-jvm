@@ -117,4 +117,51 @@ public interface LoadOrBuilder extends
    */
   com.google.protobuf.ByteString
       getCommandTreeBytes();
+
+  /**
+   * <pre>
+   * The plugin-defined event types this plugin provides or subscribes to, with
+   * the id the host assigned each of them. Empty for a plugin that touches
+   * none, which is every plugin until one declares [[events.provides]].
+   *
+   * Sent per plugin rather than once per runtime, because a runtime has no use
+   * for the id of an event none of its plugins can see, and because the host
+   * assigns the ids from the full set of installed manifests — a fact that is
+   * only settled once every bundle has been scanned.
+   * </pre>
+   *
+   * <code>repeated .gocraft.abi.v1.EventBinding event_types = 6 [json_name = "eventTypes"];</code>
+   */
+  java.util.List<fr.gocraft.abi.v1.EventBinding> 
+      getEventTypesList();
+  /**
+   * <pre>
+   * The plugin-defined event types this plugin provides or subscribes to, with
+   * the id the host assigned each of them. Empty for a plugin that touches
+   * none, which is every plugin until one declares [[events.provides]].
+   *
+   * Sent per plugin rather than once per runtime, because a runtime has no use
+   * for the id of an event none of its plugins can see, and because the host
+   * assigns the ids from the full set of installed manifests — a fact that is
+   * only settled once every bundle has been scanned.
+   * </pre>
+   *
+   * <code>repeated .gocraft.abi.v1.EventBinding event_types = 6 [json_name = "eventTypes"];</code>
+   */
+  fr.gocraft.abi.v1.EventBinding getEventTypes(int index);
+  /**
+   * <pre>
+   * The plugin-defined event types this plugin provides or subscribes to, with
+   * the id the host assigned each of them. Empty for a plugin that touches
+   * none, which is every plugin until one declares [[events.provides]].
+   *
+   * Sent per plugin rather than once per runtime, because a runtime has no use
+   * for the id of an event none of its plugins can see, and because the host
+   * assigns the ids from the full set of installed manifests — a fact that is
+   * only settled once every bundle has been scanned.
+   * </pre>
+   *
+   * <code>repeated .gocraft.abi.v1.EventBinding event_types = 6 [json_name = "eventTypes"];</code>
+   */
+  int getEventTypesCount();
 }

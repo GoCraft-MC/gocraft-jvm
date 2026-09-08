@@ -30,6 +30,21 @@ public final class GoCraftPlugin implements Plugin<Project> {
     private static final String JITPACK = "https://jitpack.io";
     private static final String GROUP = "com.github.GoCraft-MC.gocraft-jvm";
 
+    /// Overrides that group, for a build resolving artefacts published
+    /// somewhere else.
+    ///
+    /// JitPack publishes under a group derived from the repository path,
+    /// which is not the group this project declares — so `publishToMavenLocal`
+    /// writes fr.gocraft:* while this plugin asks for com.github.*, and the
+    /// two never meet. Without a way to say so, an unreleased change to the API
+    /// cannot be built against a real plugin at all: the only way to try it is
+    /// to tag it, which is the one thing that cannot be undone.
+    ///
+    /// A project property rather than an extension: the dependencies are
+    /// declared while this plugin is applied, and an extension is not
+    /// configured until after.
+    private static final String GROUP_PROPERTY = "gocraft.artefactGroup";
+
     /// The packer is a different repository on a different clock.
     ///
     /// It would be tidy to give it this plugin's version and wrong: gocraft-cli
@@ -61,11 +76,12 @@ public final class GoCraftPlugin implements Plugin<Project> {
             repository.setUrl(JITPACK);
         });
 
-        String artefacts = artefactVersion();
+        String group = artefactGroup(project);
+        String artefacts = artefactVersion(group);
         project.getDependencies().add(JavaPlugin.COMPILE_ONLY_CONFIGURATION_NAME,
-                GROUP + ":gocraft-api-jvm:" + artefacts);
+                group + ":gocraft-api-jvm:" + artefacts);
         project.getDependencies().add(JavaPlugin.ANNOTATION_PROCESSOR_CONFIGURATION_NAME,
-                GROUP + ":gocraft-apt:" + artefacts);
+                group + ":gocraft-apt:" + artefacts);
 
         project.getExtensions().getByType(JavaPluginExtension.class)
                 .getToolchain().getLanguageVersion().convention(JavaLanguageVersion.of(JAVA));
@@ -75,7 +91,7 @@ public final class GoCraftPlugin implements Plugin<Project> {
             task.setDescription("Downloads and verifies the bundle packer for this machine.");
             task.getVersion().set(extension.getToolVersion());
             task.getRepository().set(extension.getToolRepository());
-            task.getLocal().set(extension.getToolPath());
+            task.getLocal().fileProvider(extension.getToolPath().map(java.io.File::new));
             task.getTool().set(project.getLayout().getBuildDirectory()
                     .file(extension.getToolVersion().map(name -> "gocraft/tool/gocraft-cli-" + name)));
         });
@@ -101,15 +117,34 @@ public final class GoCraftPlugin implements Plugin<Project> {
             // allowed to be empty where an input file would not be.
             task.getCommands().from(project.getLayout().getBuildDirectory()
                     .file("classes/java/main/gocraft/commands.json"));
+            task.getEvents().from(project.getLayout().getBuildDirectory()
+                    .file("classes/java/main/gocraft/events.json"));
+            // Beside plugin.toml, in the project: it is the record of what this
+            // plugin has already published, and it belongs in git next to the
+            // manifest it guards.
+            task.getLayoutLock().set(
+                    project.getLayout().getProjectDirectory().file("events.lock.json"));
         });
     }
 
-    /// This plugin's version, spelled as the tag that published it.
+    /// The group the API and the processor are published under, JitPack's
+    /// unless the build says otherwise.
+    private static String artefactGroup(Project project) {
+        Object override = project.findProperty(GROUP_PROPERTY);
+        if (override == null || override.toString().isBlank()) {
+            return GROUP;
+        }
+        return override.toString().trim();
+    }
+
+    /// This plugin's version, spelled the way the repository holding it does.
     ///
-    /// JitPack serves a tag verbatim, and the tags here are the version with a
-    /// `v`. That convention is load-bearing: get it wrong and every plugin
-    /// build fails to resolve an artefact that exists.
-    private static String artefactVersion() {
+    /// The leading `v` is JitPack's and nobody else's: it serves a tag
+    /// verbatim, and the tags here are the version with one. A Maven repository
+    /// holds the version as declared, so adding a `v` there asks for something
+    /// that does not exist — which is what made a locally published build
+    /// unusable even once the group was right.
+    private static String artefactVersion(String group) {
         Properties properties = new Properties();
         try (InputStream source = GoCraftPlugin.class.getResourceAsStream("/gocraft-plugin.properties")) {
             if (source == null) {
@@ -123,6 +158,7 @@ public final class GoCraftPlugin implements Plugin<Project> {
         if (version.isEmpty()) {
             throw new IllegalStateException("the plugin jar declares no version");
         }
-        return version.startsWith("v") ? version : "v" + version;
+        String plain = version.startsWith("v") ? version.substring(1) : version;
+        return GROUP.equals(group) ? "v" + plain : plain;
     }
 }

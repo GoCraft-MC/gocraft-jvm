@@ -5,7 +5,7 @@ import java.util.Arrays;
 /// Builders for the values an effect carries.
 ///
 /// Generated event classes call these, which is why they are public. A plugin
-/// uses the named method the generator emitted — `sendMessage(...)` — and never
+/// uses the verb on the noun it happens to — `player.sendMessage(...)` — and never
 /// needs to name a Value at all.
 public final class Values {
 

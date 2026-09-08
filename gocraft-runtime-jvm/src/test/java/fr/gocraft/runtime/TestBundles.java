@@ -74,12 +74,18 @@ final class TestBundles {
         if (compiler == null) {
             throw new IllegalStateException("no javac; these tests need a JDK, not a JRE");
         }
-        int status = compiler.run(null, null, null,
+        // javac's own diagnostics, captured rather than dropped. Without them a
+        // failure here says only that something did not compile, and the source
+        // is a text block in another file — which is a long way to walk for a
+        // missing method the compiler already named.
+        var diagnostics = new java.io.ByteArrayOutputStream();
+        int status = compiler.run(null, null, diagnostics,
                 "-classpath", System.getProperty("java.class.path"),
                 "-d", classes.toString(),
                 file.toString());
         if (status != 0) {
-            throw new IllegalStateException("compiling the test plugin failed");
+            throw new IllegalStateException("compiling the test plugin failed:\n"
+                    + diagnostics.toString(java.nio.charset.StandardCharsets.UTF_8));
         }
 
         // Every class the compiler produced, not just the named one: a plugin

@@ -17,6 +17,7 @@ import org.gradle.api.file.DirectoryProperty;
 import org.gradle.api.file.RegularFileProperty;
 import org.gradle.api.tasks.InputFile;
 import org.gradle.api.tasks.InputFiles;
+import org.gradle.api.tasks.Optional;
 import org.gradle.api.tasks.Internal;
 import org.gradle.api.tasks.OutputFile;
 import org.gradle.api.tasks.PathSensitive;
@@ -62,6 +63,46 @@ public abstract class BundleTask extends DefaultTask {
     @PathSensitive(PathSensitivity.RELATIVE)
     public abstract ConfigurableFileCollection getCommands();
 
+    /// The event layouts gocraft-apt wrote, for the same reason and in the same
+    /// shape: most plugins define no events, and a collection is allowed to be
+    /// empty where an optional file property is not.
+    ///
+    /// The packer merges them into the manifest it writes into the bundle, so
+    /// the events a plugin defines are described by the classes the compiler
+    /// saw rather than by a block the author kept in step by hand.
+    @InputFiles
+    @PathSensitive(PathSensitivity.RELATIVE)
+    public abstract ConfigurableFileCollection getEvents();
+
+    /// The record of what this plugin's events looked like when it was last
+    /// built, kept in the project and meant to be committed.
+    ///
+    /// The packer compares the layouts the compiler just extracted against it
+    /// and refuses a reordered or removed field: the index is what the wire
+    /// carries, so swapping two fields hands every subscriber already compiled
+    /// against the old layout the wrong one, silently and with nothing anywhere
+    /// saying so. Appending is allowed.
+    ///
+    /// It points at the project and not at the staging directory, which this
+    /// task empties on every run — a record written there would be gone before
+    /// the next build could read it.
+    ///
+    /// An optional **input**, and neither an output nor internal. Both of the
+    /// other two are wrong in a way that was measured rather than reasoned
+    /// about: as an @OutputFile Gradle deletes it when the task is out of date,
+    /// and deleting the record is precisely what must not happen, since the
+    /// build after that accepts anything; as @Internal it is not part of the
+    /// up-to-date check, so editing the record does not re-run the task and the
+    /// comparison silently does not happen.
+    ///
+    /// The task does write it, which makes this an input the task also updates.
+    /// That is honest rather than tidy: the next build's answer genuinely
+    /// depends on what this one recorded.
+    @InputFile
+    @Optional
+    @PathSensitive(PathSensitivity.RELATIVE)
+    public abstract RegularFileProperty getLayoutLock();
+
     @OutputFile
     public abstract RegularFileProperty getBundle();
 
@@ -90,6 +131,17 @@ public abstract class BundleTask extends DefaultTask {
             if (declared.isFile()) {
                 arguments.add("-commands");
                 arguments.add(declared.getAbsolutePath());
+                break;
+            }
+        }
+        for (File declared : getEvents()) {
+            if (declared.isFile()) {
+                arguments.add("-events");
+                arguments.add(declared.getAbsolutePath());
+                if (getLayoutLock().isPresent()) {
+                    arguments.add("-layout-lock");
+                    arguments.add(getLayoutLock().get().getAsFile().getAbsolutePath());
+                }
                 break;
             }
         }

@@ -8,6 +8,7 @@ import fr.gocraft.abi.v1.Unload;
 import fr.gocraft.abi.v1.Verdict;
 import fr.gocraft.api.CommandContext;
 import fr.gocraft.api.CommandHandler;
+import fr.gocraft.api.CustomEvent;
 import fr.gocraft.api.Event;
 import fr.gocraft.api.event.GeneratedEvents;
 
@@ -29,13 +30,26 @@ final class PluginRegistry implements AutoCloseable {
 
     private final Map<String, LoadedPlugin> plugins = new ConcurrentHashMap<>();
     private final PluginLoader loader;
+    private final Emitter emitter;
 
-    PluginRegistry() {
-        this(defaultWorkDirectory());
+    PluginRegistry(Emitter emitter) {
+        this(defaultWorkDirectory(), emitter);
     }
 
     PluginRegistry(Path workDirectory) {
+        this(workDirectory, null);
+    }
+
+    PluginRegistry(Path workDirectory, Emitter emitter) {
         this.loader = new PluginLoader(workDirectory);
+        this.emitter = emitter;
+    }
+
+    /// The publisher this runtime's plugins emit through. Null in a test that
+    /// builds a registry with no connection behind it; a plugin that tries to
+    /// emit then learns so by name rather than by NullPointerException.
+    Emitter emitter() {
+        return emitter;
     }
 
     private static Path defaultWorkDirectory() {
@@ -62,8 +76,14 @@ final class PluginRegistry implements AutoCloseable {
         }
         try {
             LoadedPlugin loaded = loader.load(id, request.getBundlePath(), request.getEntry(),
-                    request.getDataDirectory(), request.getCommandTree());
+                    request.getDataDirectory(), request.getCommandTree(),
+                    EventBindings.of(request.getEventTypesList()), emitter);
             plugins.put(id, loaded);
+            // The reflective call, which is all this side warms on its own:
+            // everything else arrives as a warm DISPATCH once every plugin is
+            // loaded. Before the reply because the host waits for it anyway,
+            // and it waits without a budget.
+            Warmup.run();
             // What the plugin actually registered. The host checks it against
             // the manifest it validated and refuses anything undeclared, which
             // it would otherwise never route — leaving the author with a
@@ -105,20 +125,115 @@ final class PluginRegistry implements AutoCloseable {
         if (loaded == null) {
             return allow(seq);
         }
+        if (request.getWarm()) {
+            return warm(seq, loaded, request);
+        }
+        String type = request.getEvent().getType();
         var fields = EventCodec.fields(request.getEvent().getFieldsList());
-        Event event = GeneratedEvents.create(request.getEvent().getType(), fields);
-        if (event == null) {
-            // An event this build does not know. Allowing is the only honest
-            // answer: refusing something we cannot inspect would prevent
-            // gameplay on the strength of a version mismatch.
-            System.err.println("gocraft-runtime: " + pluginId + " was sent "
-                    + request.getEvent().getType() + ", which this build does not know");
+        Subscriptions.ProblemReporter problems = (handler, thrown) ->
+                System.err.println("gocraft-runtime: " + pluginId + " handler " + handler
+                        + " threw " + thrown);
+        Control control = new Control();
+
+        Event event = GeneratedEvents.create(type, fields, control);
+        if (event != null) {
+            loaded.subscriptions().dispatch(type, event, control, problems);
+            return Envelopes.verdict(seq, EventCodec.verdict(control, List.of()));
+        }
+        return dispatchCustom(seq, pluginId, loaded, type, fields, control, problems);
+    }
+
+    /// Runs a plugin-defined event through the class this plugin declared for
+    /// it.
+    ///
+    /// The payload is positional and this side has no generated factory for it,
+    /// so the codec of whichever handler subscribed is what builds the object —
+    /// which is also what makes a mismatched layout an error naming the field
+    /// rather than a handler reading somebody else's price.
+    ///
+    /// What the handlers changed is worked out by comparing the object
+    /// afterwards, which is what an ordinary class with no framework in it
+    /// allows: it has nowhere to record a write, so nobody asks it to.
+    ///
+    /// Effects are collected all the same. The control is handed to the codec
+    /// as the [fr.gocraft.api.EffectSink] the payload's handles bind to, so a
+    /// PlayerRef the event carries is somebody this subscriber can answer, and
+    /// anyone else is reachable through [fr.gocraft.api.EventControl#player].
+    /// They leave with the verdict like a native event's do.
+    private Envelope dispatchCustom(long seq, String pluginId, LoadedPlugin loaded, String type,
+            List<fr.gocraft.api.Value> fields, Control control,
+            Subscriptions.ProblemReporter problems) {
+        CustomEvent codec = loaded.subscriptions().codecFor(type);
+        if (codec == null) {
+            // An event nothing here handles, or one this build does not know.
+            // Allowing is the only honest answer: refusing something we cannot
+            // inspect would stop gameplay on the strength of a version mismatch.
+            System.err.println("gocraft-runtime: " + pluginId + " was sent " + type
+                    + ", which no handler here declares");
             return allow(seq);
         }
-        loaded.subscriptions().dispatch(event.type(), event, (handler, thrown) ->
-                System.err.println("gocraft-runtime: " + pluginId + " handler " + handler
-                        + " threw " + thrown));
-        return Envelopes.verdict(seq, EventCodec.verdict(event));
+        Object event;
+        try {
+            event = codec.create(fields, control);
+        } catch (RuntimeException malformed) {
+            // The provider and this subscriber disagree about the layout. Said
+            // out loud and allowed, rather than cancelling on a decode failure:
+            // whatever the event announced is not this plugin's to refuse over
+            // a bug of its own.
+            System.err.println("gocraft-runtime: " + pluginId + " cannot read " + type
+                    + ": " + malformed.getMessage());
+            return allow(seq);
+        }
+        loaded.subscriptions().dispatch(type, event, control, problems);
+        return Envelopes.verdict(seq, EventCodec.verdict(control,
+                EventCodec.changes(fields, codec.fields(event))));
+    }
+
+    /// Runs one subscription's dispatch path without reaching its handlers.
+    ///
+    /// The host sends these between LOAD and READY, where it waits without a
+    /// budget, so the first real event of a type does not pay for a cold JVM
+    /// out of the budget it shares with every other subscriber. It arrives as
+    /// an ordinary DISPATCH down the ordinary socket, carrying a payload of the
+    /// event's own shape that the host built — which is the point twice over.
+    ///
+    /// Once, because a runtime that warmed itself would warm a copy of this
+    /// path, and whatever the copy left out would still be cold when the tick
+    /// was waiting. Twice, because a payload the runtime made for itself never
+    /// crosses the socket: the first version of this sent no values and let
+    /// this side invent them, which left the protobuf parse and the conversion
+    /// — about two milliseconds, once per process — exactly as cold as before.
+    ///
+    /// So this is [#dispatch] with one thing removed. **No handler runs.** The
+    /// values are placeholders and an author's code would be deciding about a
+    /// purchase nobody made — the one line this runtime does not cross, in a
+    /// warm-up that otherwise runs everything it executes itself.
+    private Envelope warm(long seq, LoadedPlugin loaded, Dispatch request) {
+        String type = request.getEvent().getType();
+        Control control = new Control();
+        try {
+            List<fr.gocraft.api.Value> fields =
+                    EventCodec.fields(request.getEvent().getFieldsList());
+            Event event = GeneratedEvents.create(type, fields, control);
+            if (event == null) {
+                CustomEvent codec = loaded.subscriptions().codecFor(type);
+                if (codec != null) {
+                    Object custom = codec.create(fields, control);
+                    // Both directions, because a dispatch runs both: the object
+                    // is read back to work out what the handlers changed, and
+                    // written to when the mutations come home.
+                    EventCodec.changes(fields, codec.fields(custom));
+                    codec.setFields(custom, fields);
+                }
+            }
+        } catch (RuntimeException | Error ignored) {
+            // A warm-up that failed has cost the load nothing, and reporting it
+            // would be reporting an optimisation. The first real event will say
+            // the same thing with a payload someone sent.
+        }
+        // Answered like any dispatch, so the reply path warms too — and so the
+        // host knows the round finished rather than guessing at a delay.
+        return Envelopes.verdict(seq, EventCodec.verdict(control, List.of()));
     }
 
     /// Runs one command in one plugin and answers.

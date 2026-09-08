@@ -1,5 +1,6 @@
 package fr.gocraft.runtime;
 
+import fr.gocraft.abi.v1.Emit;
 import fr.gocraft.abi.v1.Envelope;
 import fr.gocraft.abi.v1.Fail;
 import fr.gocraft.abi.v1.Hello;
@@ -54,5 +55,13 @@ final class Envelopes {
 
     static Envelope verdict(long seq, Verdict verdict) {
         return Envelope.newBuilder().setSeq(seq).setVerdict(verdict).build();
+    }
+
+    /// The one envelope this runtime sends that is not a reply.
+    ///
+    /// The seq is its own, not an echo, and [Emitter] is what supplies it —
+    /// even, where the host's are odd, so the two numberings cannot collide.
+    static Envelope emit(long seq, Emit emission) {
+        return Envelope.newBuilder().setSeq(seq).setEmit(emission).build();
     }
 }

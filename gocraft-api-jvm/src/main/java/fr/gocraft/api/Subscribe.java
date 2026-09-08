@@ -12,7 +12,7 @@ import java.lang.annotation.Target;
 ///     public void onBlockBreak(BlockBreakEvent e) {
 ///         if (e.pos().distanceSq(SPAWN) < 4096 && !e.can("spawn.bypass")) {
 ///             e.cancel();
-///             e.sendMessage("Protected area.");
+///             e.player().sendMessage("Protected area.");
 ///         }
 ///     }
 ///

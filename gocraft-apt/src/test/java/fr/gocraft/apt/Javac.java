@@ -49,9 +49,16 @@ final class Javac {
     }
 
     static Result compile(String className, String source) throws IOException {
+        return compile(className, source, CommandProcessor.class.getName());
+    }
+
+    /// The processor is a parameter because this module now has two, and a
+    /// test that ran both would report the other one's silence as a missing
+    /// generated file.
+    static Result compile(String className, String source, String processor) throws IOException {
         Path root = Files.createTempDirectory("apt");
         try {
-            return run(root, className, source);
+            return run(root, className, source, processor);
         } finally {
             delete(root);
         }
@@ -73,13 +80,14 @@ final class Javac {
 
     static Loaded compileAndLoad(String className, String source) throws IOException {
         Path root = Files.createTempDirectory("apt");
-        Result result = run(root, className, source);
+        Result result = run(root, className, source, CommandProcessor.class.getName());
         URLClassLoader loader = new URLClassLoader(
                 new URL[] {root.resolve("out").toUri().toURL()}, Javac.class.getClassLoader());
         return new Loaded(result, loader, root);
     }
 
-    private static Result run(Path root, String className, String source) throws IOException {
+    private static Result run(Path root, String className, String source, String processor)
+            throws IOException {
         {
             Path sources = Files.createDirectories(root.resolve("src"));
             Path classes = Files.createDirectories(root.resolve("out"));
@@ -95,7 +103,7 @@ final class Javac {
                         "-classpath", System.getProperty("java.class.path"),
                         "-d", classes.toString(),
                         "-s", emitted.toString(),
-                        "-processor", CommandProcessor.class.getName());
+                        "-processor", processor);
                 compiler.getTask(null, files, collected, options, null,
                         files.getJavaFileObjects(file)).call();
             }

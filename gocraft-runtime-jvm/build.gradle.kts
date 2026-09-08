@@ -1,3 +1,5 @@
+import java.security.MessageDigest
+
 // The host: the jar the GoCraft server extracts and spawns to run JVM plugins.
 //
 // No plugin depends on this. It sits on the other side of the boundary from
@@ -47,36 +49,104 @@ sourceSets {
 
 // abiSchema points at the directory holding abi/v1/*.proto. It defaults to the
 // sibling gocraft-abi checkout, which is where deliverable 01 put the schema.
+//
+// Resolved against the root rather than this module, so a relative path means
+// what the default reads as: ../gocraft-abi is gocraft-jvm's sibling, not
+// gocraft-runtime-jvm's. Project.file() resolved it one directory too deep, so
+// the task could only ever run with -PabiSchema — which went unnoticed because
+// nothing makes it run.
 val abiSchema: String by project
+val schemaDirectory = rootProject.file(abiSchema)
+
+// The two schemas this module generates from. envelope.proto imports
+// commands.proto and imports nothing else, so these two are the whole input:
+// events.proto and options.proto are read by protoc-gen-gocraft to shape the
+// generated event classes and are never serialised.
+val abiSources = listOf("abi/v1/envelope.proto", "abi/v1/commands.proto")
+
+// Where the fingerprint of the schema these sources came from is kept.
+//
+// The generated protobuf classes live in src/main/generated and are committed,
+// so no consumer needs buf to build — and so nothing regenerates them when the
+// schema moves. That silence is the failure mode, not a convenience: adding a
+// field to Dispatch and running `build` produced "cannot find symbol" on a
+// getter, pointing at the call site rather than at the stale file that caused
+// it. The fingerprint turns that into a sentence naming the task to run.
+val schemaStamp = layout.projectDirectory.file("src/main/generated/abi-schema.sha256")
+
+fun fingerprint(): String {
+    val digest = MessageDigest.getInstance("SHA-256")
+    for (name in abiSources) {
+        digest.update(name.toByteArray())
+        digest.update(schemaDirectory.resolve(name).readBytes())
+    }
+    return digest.digest().joinToString("") { "%02x".format(it) }
+}
+
+fun schemaPresent(): Boolean =
+    abiSources.all { schemaDirectory.resolve(it).exists() }
 
 tasks.register<Exec>("generateProto") {
     description = "Regenerates the ABI sources from the gocraft-abi schema. Needs buf."
     group = "build"
-    val schema = file(abiSchema)
+    inputs.files(abiSources.map { schemaDirectory.resolve(it) })
+    outputs.file(schemaStamp)
     doFirst {
-        if (!schema.resolve("abi/v1/envelope.proto").exists()) {
+        if (!schemaPresent()) {
             throw GradleException(
-                "no ABI schema at ${schema.absolutePath}. Point abiSchema in " +
+                "no ABI schema at ${schemaDirectory.absolutePath}. Point abiSchema in " +
                     "gradle.properties at a gocraft-abi checkout, or pass " +
                     "-PabiSchema=<path>."
             )
         }
     }
-    workingDir = schema
-    // The envelope and the command schema. events.proto and options.proto are
-    // read by protoc-gen-gocraft to decide what the generated event classes
-    // look like; they are never serialised, so their protobuf message classes
-    // would be dead weight in a jar with a 3 MB budget — and an invitation to
-    // import fr.gocraft.abi.v1.BlockBreak instead of the event class that
-    // carries the named accessors.
-    //
+    workingDir = schemaDirectory
     // commands.proto is here because the envelope imports it: Invoke carries a
     // CommandArgumentType, so generating one without the other leaves the
     // envelope referring to a class that does not exist.
     commandLine("buf", "generate", "--template", file("buf.gen.yaml").absolutePath,
         "-o", projectDir.absolutePath,
-        "--path", "abi/v1/envelope.proto", "--path", "abi/v1/commands.proto")
+        *abiSources.flatMap { listOf("--path", it) }.toTypedArray())
+    doLast {
+        schemaStamp.asFile.writeText(fingerprint() + "\n")
+    }
 }
+
+// checkProto fails when the committed sources no longer match the schema.
+//
+// It needs no buf and no network: it hashes the two .proto files and compares
+// against what generateProto recorded, so it is the same answer on a fresh
+// clone as on the machine that generated them — which a timestamp would not be.
+//
+// Skipped, not failed, when the sibling checkout is absent. Someone building
+// this module alone has no schema to have drifted from, and a check that
+// refused to run without one would make the committed sources useless for
+// exactly the case they exist for.
+val checkProto = tasks.register("checkProto") {
+    description = "Fails if the committed ABI sources drifted from the schema."
+    group = "verification"
+    doLast {
+        if (!schemaPresent()) {
+            logger.lifecycle("checkProto: no schema at ${schemaDirectory.absolutePath}, skipped")
+            return@doLast
+        }
+        val recorded = if (schemaStamp.asFile.exists()) {
+            schemaStamp.asFile.readText().trim()
+        } else {
+            ""
+        }
+        if (recorded != fingerprint()) {
+            throw GradleException(
+                "the generated ABI sources in src/main/generated were built from a " +
+                    "different abi/v1 schema than the one at " +
+                    "${schemaDirectory.absolutePath}. Run " +
+                    "`./gradlew :gocraft-runtime-jvm:generateProto` and commit the result."
+            )
+        }
+    }
+}
+
+tasks.named("check") { dependsOn(checkProto) }
 
 tasks.jar {
     // The name the GoCraft host embeds and spawns.

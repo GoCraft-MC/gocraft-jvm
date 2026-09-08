@@ -57,7 +57,7 @@ final class PluginLoader {
     }
 
     LoadedPlugin load(String pluginId, String bundlePath, String entry, String dataDirectory,
-            String commandTree) throws LoadFailure {
+            String commandTree, EventBindings eventTypes, Emitter emitter) throws LoadFailure {
         if (entry == null || entry.isBlank()) {
             // §05 makes the main class optional, but only once the runtime can
             // find annotated classes on its own. Until then there is nothing to
@@ -77,7 +77,7 @@ final class PluginLoader {
             Subscriptions subscriptions = new Subscriptions();
             CommandBindings commands = readCommands(bundlePath, commandTree);
             Plugin instance = instantiate(loader, pluginId, entry, subscriptions, dataDirectory,
-                    commands);
+                    commands, eventTypes, emitter);
             registerOwnHandlers(instance, subscriptions);
             LoadedPlugin loaded = new LoadedPlugin(pluginId, loader, extracted, instance,
                     subscriptions, commands);
@@ -251,8 +251,8 @@ final class PluginLoader {
     /// asked for a DataStore before the ABI can carry one deserves to be told
     /// that, not to see a NoSuchMethodException.
     private Plugin instantiate(PluginClassLoader loader, String pluginId, String entry,
-            Subscriptions subscriptions, String dataDirectory, CommandBindings commands)
-            throws LoadFailure {
+            Subscriptions subscriptions, String dataDirectory, CommandBindings commands,
+            EventBindings eventTypes, Emitter emitter) throws LoadFailure {
         Class<?> type;
         try {
             type = Class.forName(entry, false, loader);
@@ -272,7 +272,7 @@ final class PluginLoader {
         }
         Constructor<?> constructor = constructors[0];
         Object[] arguments = resolve(constructor, pluginId, entry, subscriptions, dataDirectory,
-                commands);
+                commands, eventTypes, emitter);
         try {
             constructor.setAccessible(true);
             return (Plugin) constructor.newInstance(arguments);
@@ -285,14 +285,14 @@ final class PluginLoader {
     }
 
     private Object[] resolve(Constructor<?> constructor, String pluginId, String entry,
-            Subscriptions subscriptions, String dataDirectory, CommandBindings commands)
-            throws LoadFailure {
+            Subscriptions subscriptions, String dataDirectory, CommandBindings commands,
+            EventBindings eventTypes, Emitter emitter) throws LoadFailure {
         Class<?>[] parameters = constructor.getParameterTypes();
         Object[] arguments = new Object[parameters.length];
         for (int index = 0; index < parameters.length; index++) {
             if (parameters[index] == Host.class) {
                 arguments[index] = new RuntimeHost(pluginId, subscriptions, dataDirectory,
-                        commands);
+                        commands, eventTypes, emitter);
                 continue;
             }
             throw new LoadFailure(entry + " asks for a " + parameters[index].getName()
@@ -313,7 +313,13 @@ final class PluginLoader {
     /// carries. Naming them alike would make dataDirectory() an illegal
     /// override rather than a conversion.
     private record RuntimeHost(String pluginId, Subscriptions subscriptions, String data,
-            CommandBindings commands) implements Host {
+            CommandBindings commands, EventBindings eventTypes, Emitter emitter) implements Host {
+
+        @Override
+        public boolean emit(Object event) {
+            return Emissions.publish(pluginId, eventTypes, emitter, event);
+        }
+
         @Override
         public void log(String message) {
             System.out.println("[" + pluginId + "] " + message);

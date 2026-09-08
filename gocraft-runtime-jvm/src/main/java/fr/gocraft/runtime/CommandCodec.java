@@ -41,7 +41,9 @@ final class CommandCodec {
                 permissions.put(node, allowed);
             }
         }
-        PlayerRef player = PlayerRef.of(EventCodec.value(wire.getPlayer()));
+        // Unbound: the context that carries this command's effects does not
+        // exist yet, and binds the handle itself once it does.
+        PlayerRef player = PlayerRef.of(EventCodec.value(wire.getPlayer()), null);
         return new CommandSender(wire.getName(), player, permissions);
     }
 

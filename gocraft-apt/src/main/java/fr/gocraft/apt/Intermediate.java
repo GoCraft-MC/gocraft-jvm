@@ -65,35 +65,14 @@ final class Intermediate {
         out.append(pad).append('}').append(last ? "" : ",").append('\n');
     }
 
-    private void field(int depth, String name, String value) {
-        out.append("  ".repeat(depth)).append(quote(name)).append(": ").append(quote(value)).append(",\n");
-    }
-
-    /// Escapes what a command name or a permission node can legally hold.
+    /// One key and its value.
     ///
     /// Names are checked before they get here — no whitespace, no slash — so
     /// the only characters left to worry about are the ones an ArgType
     /// expression carries, and a backslash or a quote in one of those would
-    /// otherwise produce JSON nothing can read.
-    private static String quote(String value) {
-        StringBuilder quoted = new StringBuilder("\"");
-        for (int index = 0; index < value.length(); index++) {
-            char character = value.charAt(index);
-            switch (character) {
-                case '"' -> quoted.append("\\\"");
-                case '\\' -> quoted.append("\\\\");
-                case '\n' -> quoted.append("\\n");
-                case '\r' -> quoted.append("\\r");
-                case '\t' -> quoted.append("\\t");
-                default -> {
-                    if (character < 0x20) {
-                        quoted.append(String.format("\\u%04x", (int) character));
-                    } else {
-                        quoted.append(character);
-                    }
-                }
-            }
-        }
-        return quoted.append('"').toString();
+    /// otherwise produce JSON nothing can read. [Json#quote] handles them, and
+    /// handles them the same way for the event layouts.
+    private void field(int depth, String name, String value) {
+        out.append("  ".repeat(depth)).append(Json.quote(name)).append(": ").append(Json.quote(value)).append(",\n");
     }
 }

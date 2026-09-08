@@ -26,6 +26,7 @@ public  final class Load extends
     entry_ = "";
     dataDirectory_ = "";
     commandTree_ = "";
+    eventTypes_ = emptyProtobufList();
   }
   public static final int PLUGIN_ID_FIELD_NUMBER = 1;
   private java.lang.String pluginId_;
@@ -380,6 +381,221 @@ public  final class Load extends
     checkByteStringIsUtf8(value);
     commandTree_ = value.toStringUtf8();
 
+  }
+
+  public static final int EVENT_TYPES_FIELD_NUMBER = 6;
+  private com.google.protobuf.Internal.ProtobufList<fr.gocraft.abi.v1.EventBinding> eventTypes_;
+  /**
+   * <pre>
+   * The plugin-defined event types this plugin provides or subscribes to, with
+   * the id the host assigned each of them. Empty for a plugin that touches
+   * none, which is every plugin until one declares [[events.provides]].
+   *
+   * Sent per plugin rather than once per runtime, because a runtime has no use
+   * for the id of an event none of its plugins can see, and because the host
+   * assigns the ids from the full set of installed manifests — a fact that is
+   * only settled once every bundle has been scanned.
+   * </pre>
+   *
+   * <code>repeated .gocraft.abi.v1.EventBinding event_types = 6 [json_name = "eventTypes"];</code>
+   */
+  @java.lang.Override
+  public java.util.List<fr.gocraft.abi.v1.EventBinding> getEventTypesList() {
+    return eventTypes_;
+  }
+  /**
+   * <pre>
+   * The plugin-defined event types this plugin provides or subscribes to, with
+   * the id the host assigned each of them. Empty for a plugin that touches
+   * none, which is every plugin until one declares [[events.provides]].
+   *
+   * Sent per plugin rather than once per runtime, because a runtime has no use
+   * for the id of an event none of its plugins can see, and because the host
+   * assigns the ids from the full set of installed manifests — a fact that is
+   * only settled once every bundle has been scanned.
+   * </pre>
+   *
+   * <code>repeated .gocraft.abi.v1.EventBinding event_types = 6 [json_name = "eventTypes"];</code>
+   */
+  public java.util.List<? extends fr.gocraft.abi.v1.EventBindingOrBuilder> 
+      getEventTypesOrBuilderList() {
+    return eventTypes_;
+  }
+  /**
+   * <pre>
+   * The plugin-defined event types this plugin provides or subscribes to, with
+   * the id the host assigned each of them. Empty for a plugin that touches
+   * none, which is every plugin until one declares [[events.provides]].
+   *
+   * Sent per plugin rather than once per runtime, because a runtime has no use
+   * for the id of an event none of its plugins can see, and because the host
+   * assigns the ids from the full set of installed manifests — a fact that is
+   * only settled once every bundle has been scanned.
+   * </pre>
+   *
+   * <code>repeated .gocraft.abi.v1.EventBinding event_types = 6 [json_name = "eventTypes"];</code>
+   */
+  @java.lang.Override
+  public int getEventTypesCount() {
+    return eventTypes_.size();
+  }
+  /**
+   * <pre>
+   * The plugin-defined event types this plugin provides or subscribes to, with
+   * the id the host assigned each of them. Empty for a plugin that touches
+   * none, which is every plugin until one declares [[events.provides]].
+   *
+   * Sent per plugin rather than once per runtime, because a runtime has no use
+   * for the id of an event none of its plugins can see, and because the host
+   * assigns the ids from the full set of installed manifests — a fact that is
+   * only settled once every bundle has been scanned.
+   * </pre>
+   *
+   * <code>repeated .gocraft.abi.v1.EventBinding event_types = 6 [json_name = "eventTypes"];</code>
+   */
+  @java.lang.Override
+  public fr.gocraft.abi.v1.EventBinding getEventTypes(int index) {
+    return eventTypes_.get(index);
+  }
+  /**
+   * <pre>
+   * The plugin-defined event types this plugin provides or subscribes to, with
+   * the id the host assigned each of them. Empty for a plugin that touches
+   * none, which is every plugin until one declares [[events.provides]].
+   *
+   * Sent per plugin rather than once per runtime, because a runtime has no use
+   * for the id of an event none of its plugins can see, and because the host
+   * assigns the ids from the full set of installed manifests — a fact that is
+   * only settled once every bundle has been scanned.
+   * </pre>
+   *
+   * <code>repeated .gocraft.abi.v1.EventBinding event_types = 6 [json_name = "eventTypes"];</code>
+   */
+  public fr.gocraft.abi.v1.EventBindingOrBuilder getEventTypesOrBuilder(
+      int index) {
+    return eventTypes_.get(index);
+  }
+  private void ensureEventTypesIsMutable() {
+    com.google.protobuf.Internal.ProtobufList<fr.gocraft.abi.v1.EventBinding> tmp = eventTypes_;
+    if (!tmp.isModifiable()) {
+      eventTypes_ =
+          com.google.protobuf.GeneratedMessageLite.mutableCopy(tmp);
+     }
+  }
+
+  /**
+   * <pre>
+   * The plugin-defined event types this plugin provides or subscribes to, with
+   * the id the host assigned each of them. Empty for a plugin that touches
+   * none, which is every plugin until one declares [[events.provides]].
+   *
+   * Sent per plugin rather than once per runtime, because a runtime has no use
+   * for the id of an event none of its plugins can see, and because the host
+   * assigns the ids from the full set of installed manifests — a fact that is
+   * only settled once every bundle has been scanned.
+   * </pre>
+   *
+   * <code>repeated .gocraft.abi.v1.EventBinding event_types = 6 [json_name = "eventTypes"];</code>
+   */
+  private void setEventTypes(
+      int index, fr.gocraft.abi.v1.EventBinding value) {
+    java.util.Objects.requireNonNull(value);
+    ensureEventTypesIsMutable();
+    eventTypes_.set(index, value);
+  }
+  /**
+   * <pre>
+   * The plugin-defined event types this plugin provides or subscribes to, with
+   * the id the host assigned each of them. Empty for a plugin that touches
+   * none, which is every plugin until one declares [[events.provides]].
+   *
+   * Sent per plugin rather than once per runtime, because a runtime has no use
+   * for the id of an event none of its plugins can see, and because the host
+   * assigns the ids from the full set of installed manifests — a fact that is
+   * only settled once every bundle has been scanned.
+   * </pre>
+   *
+   * <code>repeated .gocraft.abi.v1.EventBinding event_types = 6 [json_name = "eventTypes"];</code>
+   */
+  private void addEventTypes(fr.gocraft.abi.v1.EventBinding value) {
+    java.util.Objects.requireNonNull(value);
+    ensureEventTypesIsMutable();
+    eventTypes_.add(value);
+  }
+  /**
+   * <pre>
+   * The plugin-defined event types this plugin provides or subscribes to, with
+   * the id the host assigned each of them. Empty for a plugin that touches
+   * none, which is every plugin until one declares [[events.provides]].
+   *
+   * Sent per plugin rather than once per runtime, because a runtime has no use
+   * for the id of an event none of its plugins can see, and because the host
+   * assigns the ids from the full set of installed manifests — a fact that is
+   * only settled once every bundle has been scanned.
+   * </pre>
+   *
+   * <code>repeated .gocraft.abi.v1.EventBinding event_types = 6 [json_name = "eventTypes"];</code>
+   */
+  private void addEventTypes(
+      int index, fr.gocraft.abi.v1.EventBinding value) {
+    java.util.Objects.requireNonNull(value);
+    ensureEventTypesIsMutable();
+    eventTypes_.add(index, value);
+  }
+  /**
+   * <pre>
+   * The plugin-defined event types this plugin provides or subscribes to, with
+   * the id the host assigned each of them. Empty for a plugin that touches
+   * none, which is every plugin until one declares [[events.provides]].
+   *
+   * Sent per plugin rather than once per runtime, because a runtime has no use
+   * for the id of an event none of its plugins can see, and because the host
+   * assigns the ids from the full set of installed manifests — a fact that is
+   * only settled once every bundle has been scanned.
+   * </pre>
+   *
+   * <code>repeated .gocraft.abi.v1.EventBinding event_types = 6 [json_name = "eventTypes"];</code>
+   */
+  private void addAllEventTypes(
+      java.lang.Iterable<? extends fr.gocraft.abi.v1.EventBinding> values) {
+    ensureEventTypesIsMutable();
+    com.google.protobuf.AbstractMessageLite.addAll(
+        values, eventTypes_);
+  }
+  /**
+   * <pre>
+   * The plugin-defined event types this plugin provides or subscribes to, with
+   * the id the host assigned each of them. Empty for a plugin that touches
+   * none, which is every plugin until one declares [[events.provides]].
+   *
+   * Sent per plugin rather than once per runtime, because a runtime has no use
+   * for the id of an event none of its plugins can see, and because the host
+   * assigns the ids from the full set of installed manifests — a fact that is
+   * only settled once every bundle has been scanned.
+   * </pre>
+   *
+   * <code>repeated .gocraft.abi.v1.EventBinding event_types = 6 [json_name = "eventTypes"];</code>
+   */
+  private void clearEventTypes() {
+    eventTypes_ = emptyProtobufList();
+  }
+  /**
+   * <pre>
+   * The plugin-defined event types this plugin provides or subscribes to, with
+   * the id the host assigned each of them. Empty for a plugin that touches
+   * none, which is every plugin until one declares [[events.provides]].
+   *
+   * Sent per plugin rather than once per runtime, because a runtime has no use
+   * for the id of an event none of its plugins can see, and because the host
+   * assigns the ids from the full set of installed manifests — a fact that is
+   * only settled once every bundle has been scanned.
+   * </pre>
+   *
+   * <code>repeated .gocraft.abi.v1.EventBinding event_types = 6 [json_name = "eventTypes"];</code>
+   */
+  private void removeEventTypes(int index) {
+    ensureEventTypesIsMutable();
+    eventTypes_.remove(index);
   }
 
   public static fr.gocraft.abi.v1.Load parseFrom(
@@ -850,6 +1066,240 @@ public  final class Load extends
       return this;
     }
 
+    /**
+     * <pre>
+     * The plugin-defined event types this plugin provides or subscribes to, with
+     * the id the host assigned each of them. Empty for a plugin that touches
+     * none, which is every plugin until one declares [[events.provides]].
+     *
+     * Sent per plugin rather than once per runtime, because a runtime has no use
+     * for the id of an event none of its plugins can see, and because the host
+     * assigns the ids from the full set of installed manifests — a fact that is
+     * only settled once every bundle has been scanned.
+     * </pre>
+     *
+     * <code>repeated .gocraft.abi.v1.EventBinding event_types = 6 [json_name = "eventTypes"];</code>
+     */
+    @java.lang.Override
+    public java.util.List<fr.gocraft.abi.v1.EventBinding> getEventTypesList() {
+      return java.util.Collections.unmodifiableList(
+          instance.getEventTypesList());
+    }
+    /**
+     * <pre>
+     * The plugin-defined event types this plugin provides or subscribes to, with
+     * the id the host assigned each of them. Empty for a plugin that touches
+     * none, which is every plugin until one declares [[events.provides]].
+     *
+     * Sent per plugin rather than once per runtime, because a runtime has no use
+     * for the id of an event none of its plugins can see, and because the host
+     * assigns the ids from the full set of installed manifests — a fact that is
+     * only settled once every bundle has been scanned.
+     * </pre>
+     *
+     * <code>repeated .gocraft.abi.v1.EventBinding event_types = 6 [json_name = "eventTypes"];</code>
+     */
+    @java.lang.Override
+    public int getEventTypesCount() {
+      return instance.getEventTypesCount();
+    }/**
+     * <pre>
+     * The plugin-defined event types this plugin provides or subscribes to, with
+     * the id the host assigned each of them. Empty for a plugin that touches
+     * none, which is every plugin until one declares [[events.provides]].
+     *
+     * Sent per plugin rather than once per runtime, because a runtime has no use
+     * for the id of an event none of its plugins can see, and because the host
+     * assigns the ids from the full set of installed manifests — a fact that is
+     * only settled once every bundle has been scanned.
+     * </pre>
+     *
+     * <code>repeated .gocraft.abi.v1.EventBinding event_types = 6 [json_name = "eventTypes"];</code>
+     */
+    @java.lang.Override
+    public fr.gocraft.abi.v1.EventBinding getEventTypes(int index) {
+      return instance.getEventTypes(index);
+    }
+    /**
+     * <pre>
+     * The plugin-defined event types this plugin provides or subscribes to, with
+     * the id the host assigned each of them. Empty for a plugin that touches
+     * none, which is every plugin until one declares [[events.provides]].
+     *
+     * Sent per plugin rather than once per runtime, because a runtime has no use
+     * for the id of an event none of its plugins can see, and because the host
+     * assigns the ids from the full set of installed manifests — a fact that is
+     * only settled once every bundle has been scanned.
+     * </pre>
+     *
+     * <code>repeated .gocraft.abi.v1.EventBinding event_types = 6 [json_name = "eventTypes"];</code>
+     */
+    public Builder setEventTypes(
+        int index, fr.gocraft.abi.v1.EventBinding value) {
+      copyOnWrite();
+      instance.setEventTypes(index, value);
+      return this;
+    }
+    /**
+     * <pre>
+     * The plugin-defined event types this plugin provides or subscribes to, with
+     * the id the host assigned each of them. Empty for a plugin that touches
+     * none, which is every plugin until one declares [[events.provides]].
+     *
+     * Sent per plugin rather than once per runtime, because a runtime has no use
+     * for the id of an event none of its plugins can see, and because the host
+     * assigns the ids from the full set of installed manifests — a fact that is
+     * only settled once every bundle has been scanned.
+     * </pre>
+     *
+     * <code>repeated .gocraft.abi.v1.EventBinding event_types = 6 [json_name = "eventTypes"];</code>
+     */
+    public Builder setEventTypes(
+        int index, fr.gocraft.abi.v1.EventBinding.Builder builderForValue) {
+      copyOnWrite();
+      instance.setEventTypes(index,
+          builderForValue.build());
+      return this;
+    }
+    /**
+     * <pre>
+     * The plugin-defined event types this plugin provides or subscribes to, with
+     * the id the host assigned each of them. Empty for a plugin that touches
+     * none, which is every plugin until one declares [[events.provides]].
+     *
+     * Sent per plugin rather than once per runtime, because a runtime has no use
+     * for the id of an event none of its plugins can see, and because the host
+     * assigns the ids from the full set of installed manifests — a fact that is
+     * only settled once every bundle has been scanned.
+     * </pre>
+     *
+     * <code>repeated .gocraft.abi.v1.EventBinding event_types = 6 [json_name = "eventTypes"];</code>
+     */
+    public Builder addEventTypes(fr.gocraft.abi.v1.EventBinding value) {
+      copyOnWrite();
+      instance.addEventTypes(value);
+      return this;
+    }
+    /**
+     * <pre>
+     * The plugin-defined event types this plugin provides or subscribes to, with
+     * the id the host assigned each of them. Empty for a plugin that touches
+     * none, which is every plugin until one declares [[events.provides]].
+     *
+     * Sent per plugin rather than once per runtime, because a runtime has no use
+     * for the id of an event none of its plugins can see, and because the host
+     * assigns the ids from the full set of installed manifests — a fact that is
+     * only settled once every bundle has been scanned.
+     * </pre>
+     *
+     * <code>repeated .gocraft.abi.v1.EventBinding event_types = 6 [json_name = "eventTypes"];</code>
+     */
+    public Builder addEventTypes(
+        int index, fr.gocraft.abi.v1.EventBinding value) {
+      copyOnWrite();
+      instance.addEventTypes(index, value);
+      return this;
+    }
+    /**
+     * <pre>
+     * The plugin-defined event types this plugin provides or subscribes to, with
+     * the id the host assigned each of them. Empty for a plugin that touches
+     * none, which is every plugin until one declares [[events.provides]].
+     *
+     * Sent per plugin rather than once per runtime, because a runtime has no use
+     * for the id of an event none of its plugins can see, and because the host
+     * assigns the ids from the full set of installed manifests — a fact that is
+     * only settled once every bundle has been scanned.
+     * </pre>
+     *
+     * <code>repeated .gocraft.abi.v1.EventBinding event_types = 6 [json_name = "eventTypes"];</code>
+     */
+    public Builder addEventTypes(
+        fr.gocraft.abi.v1.EventBinding.Builder builderForValue) {
+      copyOnWrite();
+      instance.addEventTypes(builderForValue.build());
+      return this;
+    }
+    /**
+     * <pre>
+     * The plugin-defined event types this plugin provides or subscribes to, with
+     * the id the host assigned each of them. Empty for a plugin that touches
+     * none, which is every plugin until one declares [[events.provides]].
+     *
+     * Sent per plugin rather than once per runtime, because a runtime has no use
+     * for the id of an event none of its plugins can see, and because the host
+     * assigns the ids from the full set of installed manifests — a fact that is
+     * only settled once every bundle has been scanned.
+     * </pre>
+     *
+     * <code>repeated .gocraft.abi.v1.EventBinding event_types = 6 [json_name = "eventTypes"];</code>
+     */
+    public Builder addEventTypes(
+        int index, fr.gocraft.abi.v1.EventBinding.Builder builderForValue) {
+      copyOnWrite();
+      instance.addEventTypes(index,
+          builderForValue.build());
+      return this;
+    }
+    /**
+     * <pre>
+     * The plugin-defined event types this plugin provides or subscribes to, with
+     * the id the host assigned each of them. Empty for a plugin that touches
+     * none, which is every plugin until one declares [[events.provides]].
+     *
+     * Sent per plugin rather than once per runtime, because a runtime has no use
+     * for the id of an event none of its plugins can see, and because the host
+     * assigns the ids from the full set of installed manifests — a fact that is
+     * only settled once every bundle has been scanned.
+     * </pre>
+     *
+     * <code>repeated .gocraft.abi.v1.EventBinding event_types = 6 [json_name = "eventTypes"];</code>
+     */
+    public Builder addAllEventTypes(
+        java.lang.Iterable<? extends fr.gocraft.abi.v1.EventBinding> values) {
+      copyOnWrite();
+      instance.addAllEventTypes(values);
+      return this;
+    }
+    /**
+     * <pre>
+     * The plugin-defined event types this plugin provides or subscribes to, with
+     * the id the host assigned each of them. Empty for a plugin that touches
+     * none, which is every plugin until one declares [[events.provides]].
+     *
+     * Sent per plugin rather than once per runtime, because a runtime has no use
+     * for the id of an event none of its plugins can see, and because the host
+     * assigns the ids from the full set of installed manifests — a fact that is
+     * only settled once every bundle has been scanned.
+     * </pre>
+     *
+     * <code>repeated .gocraft.abi.v1.EventBinding event_types = 6 [json_name = "eventTypes"];</code>
+     */
+    public Builder clearEventTypes() {
+      copyOnWrite();
+      instance.clearEventTypes();
+      return this;
+    }
+    /**
+     * <pre>
+     * The plugin-defined event types this plugin provides or subscribes to, with
+     * the id the host assigned each of them. Empty for a plugin that touches
+     * none, which is every plugin until one declares [[events.provides]].
+     *
+     * Sent per plugin rather than once per runtime, because a runtime has no use
+     * for the id of an event none of its plugins can see, and because the host
+     * assigns the ids from the full set of installed manifests — a fact that is
+     * only settled once every bundle has been scanned.
+     * </pre>
+     *
+     * <code>repeated .gocraft.abi.v1.EventBinding event_types = 6 [json_name = "eventTypes"];</code>
+     */
+    public Builder removeEventTypes(int index) {
+      copyOnWrite();
+      instance.removeEventTypes(index);
+      return this;
+    }
+
     // @@protoc_insertion_point(builder_scope:gocraft.abi.v1.Load)
   }
   @java.lang.Override
@@ -871,10 +1321,12 @@ public  final class Load extends
             "entry_",
             "dataDirectory_",
             "commandTree_",
+            "eventTypes_",
+            fr.gocraft.abi.v1.EventBinding.class,
           };
           java.lang.String info =
-              "\u0000\u0005\u0000\u0000\u0001\u0005\u0005\u0000\u0000\u0000\u0001\u0208\u0002\u0208" +
-              "\u0003\u0208\u0004\u0208\u0005\u0208";
+              "\u0000\u0006\u0000\u0000\u0001\u0006\u0006\u0000\u0001\u0000\u0001\u0208\u0002\u0208" +
+              "\u0003\u0208\u0004\u0208\u0005\u0208\u0006\u001b";
           return newMessageInfo(DEFAULT_INSTANCE, info, objects);
       }
       case GET_DEFAULT_INSTANCE: {

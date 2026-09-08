@@ -80,6 +80,10 @@ final class LoadedPlugin implements AutoCloseable {
         // declared it just as a Method does. §13 lists command invokers beside
         // handlers for exactly this reason.
         commands.clear();
+        // And the generated event codecs, cached by Class in a static map. Same
+        // leak by a third route: a Class holds its loader, so one event this
+        // plugin published would retain everything it defined.
+        EventLayouts.forget(loader);
         instance = null;
 
         try {
