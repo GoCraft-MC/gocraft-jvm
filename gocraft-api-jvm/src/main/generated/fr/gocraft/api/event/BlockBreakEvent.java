@@ -14,30 +14,45 @@ import fr.gocraft.api.PlayerRef;
 /// it from the others.
 ///
 /// Introduced in ABI 1.
+/// Values belong to this dispatch, not to a live server object. Keep event
+/// instances on the handler thread and do not retain them after dispatch.
 public final class BlockBreakEvent extends fr.gocraft.api.Event {
 
+    /// The event name used in ABI dispatch and plugin subscriptions.
     public static final String TYPE = "block.break";
 
+    /// Creates the runtime's typed view with an event-owned working copy.
+    ///
+    /// @param fields positional ABI values; the caller's baseline stays unchanged
+    /// @param sink the effect collector for this dispatch
     public BlockBreakEvent(java.util.List<fr.gocraft.api.Value> fields, fr.gocraft.api.EffectSink sink) {
         super(TYPE, fields, fr.gocraft.api.Events.permissions(fields, 4), sink);
     }
 
     /// The {@code player} the event carries.
+    ///
+    /// @return the current value in this event's snapshot
     public PlayerRef player() {
         return PlayerRef.of(field(0), sink());
     }
 
     /// The {@code pos} the event carries.
+    ///
+    /// @return the current value in this event's snapshot
     public BlockPos pos() {
         return BlockPos.of(field(1));
     }
 
     /// The {@code block} the event carries.
+    ///
+    /// @return the current value in this event's snapshot
     public Block block() {
         return Block.of(field(2));
     }
 
     /// The {@code tool} the event carries.
+    ///
+    /// @return the current value in this event's snapshot
     public String tool() {
         return text(3);
     }
@@ -50,6 +65,9 @@ public final class BlockBreakEvent extends fr.gocraft.api.Event {
     ///
     /// A node the manifest never declared reads as false, because the host was
     /// never asked about it. That is a manifest bug, not a denial.
+    ///
+    /// @param node the permission name declared by the subscription
+    /// @return the host's permission answer, or false for an undeclared node
     public boolean can(String node) {
         return permission(node);
     }

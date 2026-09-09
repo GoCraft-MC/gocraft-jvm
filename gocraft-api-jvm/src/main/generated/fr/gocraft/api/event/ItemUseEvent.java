@@ -12,25 +12,38 @@ import fr.gocraft.api.PlayerRef;
 /// it from the others.
 ///
 /// Introduced in ABI 1.
+/// Values belong to this dispatch, not to a live server object. Keep event
+/// instances on the handler thread and do not retain them after dispatch.
 public final class ItemUseEvent extends fr.gocraft.api.Event {
 
+    /// The event name used in ABI dispatch and plugin subscriptions.
     public static final String TYPE = "item.use";
 
+    /// Creates the runtime's typed view with an event-owned working copy.
+    ///
+    /// @param fields positional ABI values; the caller's baseline stays unchanged
+    /// @param sink the effect collector for this dispatch
     public ItemUseEvent(java.util.List<fr.gocraft.api.Value> fields, fr.gocraft.api.EffectSink sink) {
         super(TYPE, fields, fr.gocraft.api.Events.permissions(fields, 3), sink);
     }
 
     /// The {@code player} the event carries.
+    ///
+    /// @return the current value in this event's snapshot
     public PlayerRef player() {
         return PlayerRef.of(field(0), sink());
     }
 
     /// The {@code item} the event carries.
+    ///
+    /// @return the current value in this event's snapshot
     public String item() {
         return text(1);
     }
 
     /// The {@code hand} the event carries.
+    ///
+    /// @return the current value in this event's snapshot
     public long hand() {
         return number(2);
     }
@@ -43,6 +56,9 @@ public final class ItemUseEvent extends fr.gocraft.api.Event {
     ///
     /// A node the manifest never declared reads as false, because the host was
     /// never asked about it. That is a manifest bug, not a denial.
+    ///
+    /// @param node the permission name declared by the subscription
+    /// @return the host's permission answer, or false for an undeclared node
     public boolean can(String node) {
         return permission(node);
     }
