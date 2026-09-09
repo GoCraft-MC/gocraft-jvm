@@ -12,25 +12,40 @@ import fr.gocraft.api.PlayerRef;
 /// it from the others.
 ///
 /// Introduced in ABI 1.
+/// Values belong to this dispatch, not to a live server object. Keep event
+/// instances on the handler thread and do not retain them after dispatch.
 public final class PlayerCommandEvent extends fr.gocraft.api.Event {
 
+    /// The event name used in ABI dispatch and plugin subscriptions.
     public static final String TYPE = "player.command";
 
+    /// Creates the runtime's typed view with an event-owned working copy.
+    ///
+    /// @param fields positional ABI values; the caller's baseline stays unchanged
+    /// @param sink the effect collector for this dispatch
     public PlayerCommandEvent(java.util.List<fr.gocraft.api.Value> fields, fr.gocraft.api.EffectSink sink) {
         super(TYPE, fields, fr.gocraft.api.Events.permissions(fields, 2), sink);
     }
 
     /// The {@code player} the event carries.
+    ///
+    /// @return the current value in this event's snapshot
     public PlayerRef player() {
         return PlayerRef.of(field(0), sink());
     }
 
     /// The {@code command} the event carries.
+    ///
+    /// @return the current value in this event's snapshot
     public String command() {
         return text(1);
     }
 
-    /// Changes this value for subsequent handlers and the original server action.
+    /// Updates the working value seen by subsequent handlers in this dispatch.
+    /// The runtime returns the change as a mutation; the host validates it
+    /// before applying the original action. Cancellation can prevent that action.
+    ///
+    /// @param value the replacement for {@code command}
     public void setCommand(String value) {
         field(1, new fr.gocraft.api.Value.Text(value));
     }
@@ -43,6 +58,9 @@ public final class PlayerCommandEvent extends fr.gocraft.api.Event {
     ///
     /// A node the manifest never declared reads as false, because the host was
     /// never asked about it. That is a manifest bug, not a denial.
+    ///
+    /// @param node the permission name declared by the subscription
+    /// @return the host's permission answer, or false for an undeclared node
     public boolean can(String node) {
         return permission(node);
     }
