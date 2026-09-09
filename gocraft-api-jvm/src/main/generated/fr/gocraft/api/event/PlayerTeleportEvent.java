@@ -12,65 +12,100 @@ import fr.gocraft.api.PlayerRef;
 /// it from the others.
 ///
 /// Introduced in ABI 1.
+/// Values belong to this dispatch, not to a live server object. Keep event
+/// instances on the handler thread and do not retain them after dispatch.
 public final class PlayerTeleportEvent extends fr.gocraft.api.Event {
 
+    /// The event name used in ABI dispatch and plugin subscriptions.
     public static final String TYPE = "player.teleport";
 
+    /// Creates the runtime's typed view with an event-owned working copy.
+    ///
+    /// @param fields positional ABI values; the caller's baseline stays unchanged
+    /// @param sink the effect collector for this dispatch
     public PlayerTeleportEvent(java.util.List<fr.gocraft.api.Value> fields, fr.gocraft.api.EffectSink sink) {
         super(TYPE, fields, fr.gocraft.api.Events.permissions(fields, 8), sink);
     }
 
     /// The {@code player} the event carries.
+    ///
+    /// @return the current value in this event's snapshot
     public PlayerRef player() {
         return PlayerRef.of(field(0), sink());
     }
 
     /// The {@code from_x} the event carries.
+    ///
+    /// @return the current value in this event's snapshot
     public double fromX() {
         return decimal(1);
     }
 
     /// The {@code from_y} the event carries.
+    ///
+    /// @return the current value in this event's snapshot
     public double fromY() {
         return decimal(2);
     }
 
     /// The {@code from_z} the event carries.
+    ///
+    /// @return the current value in this event's snapshot
     public double fromZ() {
         return decimal(3);
     }
 
     /// The {@code x} the event carries.
+    ///
+    /// @return the current value in this event's snapshot
     public double x() {
         return decimal(4);
     }
 
-    /// Changes this value for subsequent handlers and the original server action.
+    /// Updates the working value seen by subsequent handlers in this dispatch.
+    /// The runtime returns the change as a mutation; the host validates it
+    /// before applying the original action. Cancellation can prevent that action.
+    ///
+    /// @param value the replacement for {@code x}
     public void setX(double value) {
         field(4, new fr.gocraft.api.Value.Decimal(value));
     }
 
     /// The {@code y} the event carries.
+    ///
+    /// @return the current value in this event's snapshot
     public double y() {
         return decimal(5);
     }
 
-    /// Changes this value for subsequent handlers and the original server action.
+    /// Updates the working value seen by subsequent handlers in this dispatch.
+    /// The runtime returns the change as a mutation; the host validates it
+    /// before applying the original action. Cancellation can prevent that action.
+    ///
+    /// @param value the replacement for {@code y}
     public void setY(double value) {
         field(5, new fr.gocraft.api.Value.Decimal(value));
     }
 
     /// The {@code z} the event carries.
+    ///
+    /// @return the current value in this event's snapshot
     public double z() {
         return decimal(6);
     }
 
-    /// Changes this value for subsequent handlers and the original server action.
+    /// Updates the working value seen by subsequent handlers in this dispatch.
+    /// The runtime returns the change as a mutation; the host validates it
+    /// before applying the original action. Cancellation can prevent that action.
+    ///
+    /// @param value the replacement for {@code z}
     public void setZ(double value) {
         field(6, new fr.gocraft.api.Value.Decimal(value));
     }
 
     /// The {@code dimension} the event carries.
+    ///
+    /// @return the current value in this event's snapshot
     public long dimension() {
         return number(7);
     }
@@ -83,6 +118,9 @@ public final class PlayerTeleportEvent extends fr.gocraft.api.Event {
     ///
     /// A node the manifest never declared reads as false, because the host was
     /// never asked about it. That is a manifest bug, not a denial.
+    ///
+    /// @param node the permission name declared by the subscription
+    /// @return the host's permission answer, or false for an undeclared node
     public boolean can(String node) {
         return permission(node);
     }
