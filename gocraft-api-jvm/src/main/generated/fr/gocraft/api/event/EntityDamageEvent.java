@@ -11,40 +11,61 @@ package fr.gocraft.api.event;
 /// it from the others.
 ///
 /// Introduced in ABI 1.
+/// Values belong to this dispatch, not to a live server object. Keep event
+/// instances on the handler thread and do not retain them after dispatch.
 public final class EntityDamageEvent extends fr.gocraft.api.Event {
 
+    /// The event name used in ABI dispatch and plugin subscriptions.
     public static final String TYPE = "entity.damage";
 
+    /// Creates the runtime's typed view with an event-owned working copy.
+    ///
+    /// @param fields positional ABI values; the caller's baseline stays unchanged
+    /// @param sink the effect collector for this dispatch
     public EntityDamageEvent(java.util.List<fr.gocraft.api.Value> fields, fr.gocraft.api.EffectSink sink) {
         super(TYPE, fields, java.util.Map.of(), sink);
     }
 
     /// The {@code entity_id} the event carries.
+    ///
+    /// @return the current value in this event's snapshot
     public long entityID() {
         return number(0);
     }
 
     /// The {@code entity_type} the event carries.
+    ///
+    /// @return the current value in this event's snapshot
     public String entityType() {
         return text(1);
     }
 
     /// The {@code damage} the event carries.
+    ///
+    /// @return the current value in this event's snapshot
     public double damage() {
         return decimal(2);
     }
 
-    /// Changes this value for subsequent handlers and the original server action.
+    /// Updates the working value seen by subsequent handlers in this dispatch.
+    /// The runtime returns the change as a mutation; the host validates it
+    /// before applying the original action. Cancellation can prevent that action.
+    ///
+    /// @param value the replacement for {@code damage}
     public void setDamage(double value) {
         field(2, new fr.gocraft.api.Value.Decimal(value));
     }
 
     /// The {@code cause} the event carries.
+    ///
+    /// @return the current value in this event's snapshot
     public String cause() {
         return text(3);
     }
 
     /// The {@code dimension} the event carries.
+    ///
+    /// @return the current value in this event's snapshot
     public long dimension() {
         return number(4);
     }

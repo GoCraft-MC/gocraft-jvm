@@ -11,35 +11,52 @@ import fr.gocraft.api.PlayerRef;
 /// what it describes has already happened.
 ///
 /// Introduced in ABI 1.
+/// Values belong to this dispatch, not to a live server object. Keep event
+/// instances on the handler thread and do not retain them after dispatch.
 public final class PlayerRespawnEvent extends fr.gocraft.api.Event {
 
+    /// The event name used in ABI dispatch and plugin subscriptions.
     public static final String TYPE = "player.respawn";
 
+    /// Creates the runtime's typed view with an event-owned working copy.
+    ///
+    /// @param fields positional ABI values; the caller's baseline stays unchanged
+    /// @param sink the effect collector for this dispatch
     public PlayerRespawnEvent(java.util.List<fr.gocraft.api.Value> fields, fr.gocraft.api.EffectSink sink) {
         super(TYPE, fields, java.util.Map.of(), sink);
     }
 
     /// The {@code player} the event carries.
+    ///
+    /// @return the current value in this event's snapshot
     public PlayerRef player() {
         return PlayerRef.of(field(0), sink());
     }
 
     /// The {@code x} the event carries.
+    ///
+    /// @return the current value in this event's snapshot
     public double x() {
         return decimal(1);
     }
 
     /// The {@code y} the event carries.
+    ///
+    /// @return the current value in this event's snapshot
     public double y() {
         return decimal(2);
     }
 
     /// The {@code z} the event carries.
+    ///
+    /// @return the current value in this event's snapshot
     public double z() {
         return decimal(3);
     }
 
     /// The {@code dimension} the event carries.
+    ///
+    /// @return the current value in this event's snapshot
     public long dimension() {
         return number(4);
     }
