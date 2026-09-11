@@ -5,25 +5,26 @@ package fr.gocraft.api.event;
 
 import fr.gocraft.api.PlayerRef;
 
-/// The {@code player.join} event.
+/// The {@code player.damage} event.
 ///
-/// Observational. The tick does not wait, and cancelling is not offered because
-/// what it describes has already happened.
+/// Cancellable, and dispatched while the tick waits. Every subscriber shares
+/// one budget for the whole event, so a handler that takes its time is taking
+/// it from the others.
 ///
 /// Introduced in ABI 1.
 /// Values belong to this dispatch, not to a live server object. Keep event
 /// instances on the handler thread and do not retain them after dispatch.
-public final class PlayerJoinEvent extends fr.gocraft.api.Event {
+public final class PlayerDamageEvent extends fr.gocraft.api.Event {
 
     /// The event name used in ABI dispatch and plugin subscriptions.
-    public static final String TYPE = "player.join";
+    public static final String TYPE = "player.damage";
 
     /// Creates the runtime's typed view with an event-owned working copy.
     ///
     /// @param fields positional ABI values; the caller's baseline stays unchanged
     /// @param sink the effect collector for this dispatch
-    public PlayerJoinEvent(java.util.List<fr.gocraft.api.Value> fields, fr.gocraft.api.EffectSink sink) {
-        super(TYPE, fields, fr.gocraft.api.Events.permissions(fields, 1), sink);
+    public PlayerDamageEvent(java.util.List<fr.gocraft.api.Value> fields, fr.gocraft.api.EffectSink sink) {
+        super(TYPE, fields, fr.gocraft.api.Events.permissions(fields, 3), sink);
     }
 
     /// The {@code player} the event carries.
@@ -31,6 +32,29 @@ public final class PlayerJoinEvent extends fr.gocraft.api.Event {
     /// @return the current value in this event's snapshot
     public PlayerRef player() {
         return PlayerRef.of(field(0), sink());
+    }
+
+    /// The {@code damage} the event carries.
+    ///
+    /// @return the current value in this event's snapshot
+    public double damage() {
+        return decimal(1);
+    }
+
+    /// Updates the working value seen by subsequent handlers in this dispatch.
+    /// The runtime returns the change as a mutation; the host validates it
+    /// before applying the original action. Cancellation can prevent that action.
+    ///
+    /// @param value the replacement for {@code damage}
+    public void setDamage(double value) {
+        field(1, new fr.gocraft.api.Value.Decimal(value));
+    }
+
+    /// The {@code cause} the event carries.
+    ///
+    /// @return the current value in this event's snapshot
+    public String cause() {
+        return text(2);
     }
 
     /// Whether the acting player holds a permission.

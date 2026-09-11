@@ -5,7 +5,7 @@ package fr.gocraft.api.event;
 
 import fr.gocraft.api.PlayerRef;
 
-/// The {@code player.join} event.
+/// The {@code player.respawn} event.
 ///
 /// Observational. The tick does not wait, and cancelling is not offered because
 /// what it describes has already happened.
@@ -13,17 +13,17 @@ import fr.gocraft.api.PlayerRef;
 /// Introduced in ABI 1.
 /// Values belong to this dispatch, not to a live server object. Keep event
 /// instances on the handler thread and do not retain them after dispatch.
-public final class PlayerJoinEvent extends fr.gocraft.api.Event {
+public final class PlayerRespawnEvent extends fr.gocraft.api.Event {
 
     /// The event name used in ABI dispatch and plugin subscriptions.
-    public static final String TYPE = "player.join";
+    public static final String TYPE = "player.respawn";
 
     /// Creates the runtime's typed view with an event-owned working copy.
     ///
     /// @param fields positional ABI values; the caller's baseline stays unchanged
     /// @param sink the effect collector for this dispatch
-    public PlayerJoinEvent(java.util.List<fr.gocraft.api.Value> fields, fr.gocraft.api.EffectSink sink) {
-        super(TYPE, fields, fr.gocraft.api.Events.permissions(fields, 1), sink);
+    public PlayerRespawnEvent(java.util.List<fr.gocraft.api.Value> fields, fr.gocraft.api.EffectSink sink) {
+        super(TYPE, fields, java.util.Map.of(), sink);
     }
 
     /// The {@code player} the event carries.
@@ -33,19 +33,32 @@ public final class PlayerJoinEvent extends fr.gocraft.api.Event {
         return PlayerRef.of(field(0), sink());
     }
 
-    /// Whether the acting player holds a permission.
+    /// The {@code x} the event carries.
     ///
-    /// Already resolved: the host answers every node the manifest subscribed to
-    /// and ships the answers inside the event, so this is a map lookup rather
-    /// than a round trip taken while the tick waits.
+    /// @return the current value in this event's snapshot
+    public double x() {
+        return decimal(1);
+    }
+
+    /// The {@code y} the event carries.
     ///
-    /// A node the manifest never declared reads as false, because the host was
-    /// never asked about it. That is a manifest bug, not a denial.
+    /// @return the current value in this event's snapshot
+    public double y() {
+        return decimal(2);
+    }
+
+    /// The {@code z} the event carries.
     ///
-    /// @param node the permission name declared by the subscription
-    /// @return the host's permission answer, or false for an undeclared node
-    public boolean can(String node) {
-        return permission(node);
+    /// @return the current value in this event's snapshot
+    public double z() {
+        return decimal(3);
+    }
+
+    /// The {@code dimension} the event carries.
+    ///
+    /// @return the current value in this event's snapshot
+    public long dimension() {
+        return number(4);
     }
 
 }

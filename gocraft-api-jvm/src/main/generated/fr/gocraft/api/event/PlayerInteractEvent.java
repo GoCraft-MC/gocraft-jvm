@@ -3,27 +3,29 @@
 // Source: abi/v1/events.proto
 package fr.gocraft.api.event;
 
+import fr.gocraft.api.BlockPos;
 import fr.gocraft.api.PlayerRef;
 
-/// The {@code player.join} event.
+/// The {@code player.interact} event.
 ///
-/// Observational. The tick does not wait, and cancelling is not offered because
-/// what it describes has already happened.
+/// Cancellable, and dispatched while the tick waits. Every subscriber shares
+/// one budget for the whole event, so a handler that takes its time is taking
+/// it from the others.
 ///
 /// Introduced in ABI 1.
 /// Values belong to this dispatch, not to a live server object. Keep event
 /// instances on the handler thread and do not retain them after dispatch.
-public final class PlayerJoinEvent extends fr.gocraft.api.Event {
+public final class PlayerInteractEvent extends fr.gocraft.api.Event {
 
     /// The event name used in ABI dispatch and plugin subscriptions.
-    public static final String TYPE = "player.join";
+    public static final String TYPE = "player.interact";
 
     /// Creates the runtime's typed view with an event-owned working copy.
     ///
     /// @param fields positional ABI values; the caller's baseline stays unchanged
     /// @param sink the effect collector for this dispatch
-    public PlayerJoinEvent(java.util.List<fr.gocraft.api.Value> fields, fr.gocraft.api.EffectSink sink) {
-        super(TYPE, fields, fr.gocraft.api.Events.permissions(fields, 1), sink);
+    public PlayerInteractEvent(java.util.List<fr.gocraft.api.Value> fields, fr.gocraft.api.EffectSink sink) {
+        super(TYPE, fields, fr.gocraft.api.Events.permissions(fields, 6), sink);
     }
 
     /// The {@code player} the event carries.
@@ -31,6 +33,41 @@ public final class PlayerJoinEvent extends fr.gocraft.api.Event {
     /// @return the current value in this event's snapshot
     public PlayerRef player() {
         return PlayerRef.of(field(0), sink());
+    }
+
+    /// The {@code target} the event carries.
+    ///
+    /// @return the current value in this event's snapshot
+    public String target() {
+        return text(1);
+    }
+
+    /// The {@code pos} the event carries.
+    ///
+    /// @return the current value in this event's snapshot
+    public BlockPos pos() {
+        return BlockPos.of(field(2));
+    }
+
+    /// The {@code entity_id} the event carries.
+    ///
+    /// @return the current value in this event's snapshot
+    public long entityID() {
+        return number(3);
+    }
+
+    /// The {@code item} the event carries.
+    ///
+    /// @return the current value in this event's snapshot
+    public String item() {
+        return text(4);
+    }
+
+    /// The {@code dimension} the event carries.
+    ///
+    /// @return the current value in this event's snapshot
+    public long dimension() {
+        return number(5);
     }
 
     /// Whether the acting player holds a permission.

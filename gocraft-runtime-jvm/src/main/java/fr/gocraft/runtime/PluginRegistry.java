@@ -119,6 +119,11 @@ final class PluginRegistry implements AutoCloseable {
     /// for this, under a budget shared by every subscriber, so silence does not
     /// merely lose one verdict — it burns what was left of the budget and
     /// charges it to plugins that never ran.
+    ///
+    /// For a native event, the decoded values remain the comparison baseline
+    /// while Event owns a separate mutable list. Handlers share that event;
+    /// its final snapshot is diffed against the baseline and returned together
+    /// with cancellation and effects. The host decides which writes to accept.
     Envelope dispatch(long seq, Dispatch request) {
         String pluginId = request.getPluginId();
         LoadedPlugin loaded = plugins.get(pluginId);
@@ -138,7 +143,8 @@ final class PluginRegistry implements AutoCloseable {
         Event event = GeneratedEvents.create(type, fields, control);
         if (event != null) {
             loaded.subscriptions().dispatch(type, event, control, problems);
-            return Envelopes.verdict(seq, EventCodec.verdict(control, List.of()));
+            return Envelopes.verdict(seq, EventCodec.verdict(control,
+                    EventCodec.changes(fields, event.snapshotFields())));
         }
         return dispatchCustom(seq, pluginId, loaded, type, fields, control, problems);
     }
@@ -208,6 +214,11 @@ final class PluginRegistry implements AutoCloseable {
     /// values are placeholders and an author's code would be deciding about a
     /// purchase nobody made — the one line this runtime does not cross, in a
     /// warm-up that otherwise runs everything it executes itself.
+    ///
+    /// Native decoding also exercises mutation encoding with local synthetic
+    /// values because an unchanged payload cannot produce a non-empty diff.
+    /// Those bytes are discarded, and the reply still carries no mutations.
+    /// This warms runtime infrastructure, not plugin-owned handler code.
     private Envelope warm(long seq, LoadedPlugin loaded, Dispatch request) {
         String type = request.getEvent().getType();
         Control control = new Control();
@@ -215,7 +226,10 @@ final class PluginRegistry implements AutoCloseable {
             List<fr.gocraft.api.Value> fields =
                     EventCodec.fields(request.getEvent().getFieldsList());
             Event event = GeneratedEvents.create(type, fields, control);
-            if (event == null) {
+            if (event != null) {
+                EventCodec.changes(fields, event.snapshotFields());
+                EventCodec.warmMutationEncoding();
+            } else {
                 CustomEvent codec = loaded.subscriptions().codecFor(type);
                 if (codec != null) {
                     Object custom = codec.create(fields, control);

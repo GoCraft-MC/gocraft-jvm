@@ -20,6 +20,28 @@ final class EventCodec {
     private EventCodec() {
     }
 
+    /// Initializes mutation construction and encoding without plugin callbacks.
+    ///
+    /// An unchanged shaped payload exercises decoding and diff traversal, but
+    /// never constructs a Mutation or serializes a replacement value. These
+    /// local string/decimal changes cover those paths for native mutable fields.
+    /// The resulting bytes are discarded: neither the warmed event nor its
+    /// response gains synthetic mutations, cancellation or effects.
+    /// Plugin-owned first-use initialization still belongs to the first handler
+    /// call and may require the host's existing bounded cold-start grace.
+    static void warmMutationEncoding() {
+        var before = List.<fr.gocraft.api.Value>of(new fr.gocraft.api.Value.Text(""), new fr.gocraft.api.Value.Decimal(0));
+        var after = List.<fr.gocraft.api.Value>of(new fr.gocraft.api.Value.Text("warm"), new fr.gocraft.api.Value.Decimal(1));
+        verdict(new Control(), changes(before, after)).toByteArray();
+    }
+
+    /// Decodes the incoming payload used as the before-dispatch baseline.
+    ///
+    /// Native Event instances copy this list before allowing setter calls;
+    /// mutating the baseline itself would hide changes from [#changes].
+    ///
+    /// @param wire positional values received from the host
+    /// @return a decoded list that dispatch retains unchanged for comparison
     static List<fr.gocraft.api.Value> fields(List<Value> wire) {
         List<fr.gocraft.api.Value> read = new ArrayList<>(wire.size());
         for (Value value : wire) {
@@ -91,15 +113,14 @@ final class EventCodec {
         return builder.build();
     }
 
-    /// What the handlers changed on a plugin-defined event, as a positional
-    /// diff.
+    /// What the handlers changed on a native or plugin-defined event, as a
+    /// positional diff over an unchanged baseline and the final snapshot.
     ///
     /// Compared rather than recorded, because on this side the handler holds
     /// its own typed object and writes through its own setters: there is
-    /// nowhere to hook a recorder without making an author call one. The Go SDK
-    /// records instead, since a subscriber there works positionally already —
-    /// the wire carries the same mutations either way, and how they were
-    /// produced is each runtime's own business.
+    /// nowhere to hook a recorder without making an author call one. The Go
+    /// custom-event path records positional writes; its typed native path
+    /// compares mutable fields. Both use the same Mutation transport.
     ///
     /// As deep as the change went, which is not a refinement but a requirement.
     /// The host authorises a write by the depth of its path — MutablePath
@@ -115,6 +136,10 @@ final class EventCodec {
     /// it looks: a PlayerRef travels as a list whose first element is one, so a
     /// field nobody touched was reported as changed on every single dispatch,
     /// and the host logged a write to a read-only field for it.
+    ///
+    /// @param before the unmodified incoming values
+    /// @param after the values after handler execution
+    /// @return positional mutations; the host still enforces write permissions
     static List<Mutation> changes(List<fr.gocraft.api.Value> before,
             List<fr.gocraft.api.Value> after) {
         List<Mutation> mutations = new ArrayList<>();

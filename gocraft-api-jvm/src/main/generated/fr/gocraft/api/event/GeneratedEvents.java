@@ -25,12 +25,36 @@ public final class GeneratedEvents {
     private static final Map<String, BiFunction<List<Value>, EffectSink, Event>> BY_TYPE =
             Map.ofEntries(
                     Map.entry(BlockBreakEvent.TYPE, BlockBreakEvent::new),
-                    Map.entry(PlayerJoinEvent.TYPE, PlayerJoinEvent::new)
+                    Map.entry(PlayerJoinEvent.TYPE, PlayerJoinEvent::new),
+                    Map.entry(BlockPlaceEvent.TYPE, BlockPlaceEvent::new),
+                    Map.entry(PlayerQuitEvent.TYPE, PlayerQuitEvent::new),
+                    Map.entry(PlayerChatEvent.TYPE, PlayerChatEvent::new),
+                    Map.entry(PlayerCommandEvent.TYPE, PlayerCommandEvent::new),
+                    Map.entry(PlayerDamageEvent.TYPE, PlayerDamageEvent::new),
+                    Map.entry(PlayerDeathEvent.TYPE, PlayerDeathEvent::new),
+                    Map.entry(PlayerRespawnEvent.TYPE, PlayerRespawnEvent::new),
+                    Map.entry(PlayerTeleportEvent.TYPE, PlayerTeleportEvent::new),
+                    Map.entry(PlayerInteractEvent.TYPE, PlayerInteractEvent::new),
+                    Map.entry(InventoryClickEvent.TYPE, InventoryClickEvent::new),
+                    Map.entry(ItemUseEvent.TYPE, ItemUseEvent::new),
+                    Map.entry(EntityDamageEvent.TYPE, EntityDamageEvent::new)
             );
 
     private static final Map<Class<? extends Event>, String> BY_CLASS = Map.ofEntries(
             Map.entry(BlockBreakEvent.class, BlockBreakEvent.TYPE),
-            Map.entry(PlayerJoinEvent.class, PlayerJoinEvent.TYPE)
+            Map.entry(PlayerJoinEvent.class, PlayerJoinEvent.TYPE),
+            Map.entry(BlockPlaceEvent.class, BlockPlaceEvent.TYPE),
+            Map.entry(PlayerQuitEvent.class, PlayerQuitEvent.TYPE),
+            Map.entry(PlayerChatEvent.class, PlayerChatEvent.TYPE),
+            Map.entry(PlayerCommandEvent.class, PlayerCommandEvent.TYPE),
+            Map.entry(PlayerDamageEvent.class, PlayerDamageEvent.TYPE),
+            Map.entry(PlayerDeathEvent.class, PlayerDeathEvent.TYPE),
+            Map.entry(PlayerRespawnEvent.class, PlayerRespawnEvent.TYPE),
+            Map.entry(PlayerTeleportEvent.class, PlayerTeleportEvent.TYPE),
+            Map.entry(PlayerInteractEvent.class, PlayerInteractEvent.TYPE),
+            Map.entry(InventoryClickEvent.class, InventoryClickEvent.TYPE),
+            Map.entry(ItemUseEvent.class, ItemUseEvent.TYPE),
+            Map.entry(EntityDamageEvent.class, EntityDamageEvent.TYPE)
     );
 
     /// Builds the event a dispatch names, or null if this runtime was built
@@ -63,6 +87,15 @@ public final class GeneratedEvents {
     }
 
     private static final java.util.Set<String> CANCELLABLE = java.util.Set.of(
-            BlockBreakEvent.TYPE
+            BlockBreakEvent.TYPE,
+            BlockPlaceEvent.TYPE,
+            PlayerChatEvent.TYPE,
+            PlayerCommandEvent.TYPE,
+            PlayerDamageEvent.TYPE,
+            PlayerTeleportEvent.TYPE,
+            PlayerInteractEvent.TYPE,
+            InventoryClickEvent.TYPE,
+            ItemUseEvent.TYPE,
+            EntityDamageEvent.TYPE
     );
 }
